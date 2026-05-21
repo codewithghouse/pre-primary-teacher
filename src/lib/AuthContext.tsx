@@ -25,6 +25,7 @@ import {
 } from "firebase/firestore";
 import { auth, db } from "./firebase";
 import { isPrePrimaryClass } from "./utils";
+import { syncClaimsAndRefreshToken } from "./syncClaims";
 
 // Shape of a teacher document, mirroring teacher-dashboard's TeacherDoc.
 // Pre-primary teachers are stored in the same `teachers` collection —
@@ -90,11 +91,31 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
       if (currentUser && currentUser.email) {
         try {
+          // STEP 1: Sync custom claims FIRST. This populates request.auth.token
+          // .schoolId / .role on the user's Firebase token via Cloud Function +
+          // forced token refresh. Without it, the `teachers` list query below
+          // fails Firestore's inSameSchool() rule → cryptic "verification"
+          // error in the UI. Same flow teacher-dashboard / parent-dashboard
+          // use — must be called before any cross-doc Firestore read.
+          const synced = await syncClaimsAndRefreshToken(currentUser);
+          const claimSchoolId = synced?.schoolId || null;
+
           const email = currentUser.email.toLowerCase();
-          // V1: skip claims-sync Cloud Function; query teachers directly by email.
-          // Future: mirror teacher-dashboard pattern with syncClaimsAndRefreshToken
-          // for multi-school edge cases.
-          const q = query(collection(db, "teachers"), where("email", "==", email));
+          // Scope by schoolId when the claim is available — both more
+          // efficient (server-side filtered) AND required for the list rule
+          // to pass. The unscoped fallback path is retained only for the
+          // unlikely case where claims sync silently no-ops; rules will
+          // still allow GET on a specific doc via ownsEmail() if needed.
+          const q = claimSchoolId
+            ? query(
+                collection(db, "teachers"),
+                where("schoolId", "==", claimSchoolId),
+                where("email", "==", email)
+              )
+            : query(
+                collection(db, "teachers"),
+                where("email", "==", email)
+              );
           const snap = await getDocs(q);
 
           if (snap.empty) {
