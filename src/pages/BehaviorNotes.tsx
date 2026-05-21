@@ -92,6 +92,15 @@ export default function BehaviorNotes() {
     };
   }, [notes]);
 
+  if (classLoading) {
+    return (
+      <div className="px-4 py-12 flex flex-col items-center gap-3 text-muted-foreground">
+        <Loader2 className="w-6 h-6 animate-spin" />
+        <p className="text-xs">Resolving your class…</p>
+      </div>
+    );
+  }
+
   if (!primaryClass) {
     return (
       <div className="px-4 py-12 text-center">

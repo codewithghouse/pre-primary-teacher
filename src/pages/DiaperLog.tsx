@@ -118,6 +118,15 @@ export default function DiaperLog() {
 
   const activeChild = filtered.find((s) => s.child.id === activeChildId);
 
+  if (classLoading) {
+    return (
+      <div className="px-4 py-12 flex flex-col items-center text-muted-foreground gap-3">
+        <Loader2 className="w-6 h-6 animate-spin" />
+        <p className="text-xs">Resolving your class…</p>
+      </div>
+    );
+  }
+
   if (!primaryClass) {
     return (
       <div className="px-4 py-12 text-center">
