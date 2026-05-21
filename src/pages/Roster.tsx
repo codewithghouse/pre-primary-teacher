@@ -134,6 +134,11 @@ function ParentInviteRow({ child }: { child: RosterChild }) {
     try {
       await auditedUpdate(doc(db, "students", child.id), {
         parentEmail: cleanEmail,
+        // Mirror to `email` so syncUserClaimsV2 + parent-dashboard list-query
+        // self-discovery rule both work. K-12 parent pattern stores parent
+        // email on students.email; pre-primary uses parentEmail. Setting
+        // both keeps every downstream consumer happy.
+        email: cleanEmail,
         parentName: cleanName || child.parentName || "",
       });
       toast.success(
