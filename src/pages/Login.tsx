@@ -15,8 +15,13 @@ export default function Login({ authError }: LoginProps) {
     setSigningIn(true);
     try {
       await loginWithGoogle();
-    } catch {
-      // AuthContext handles surfacing the error
+    } catch (err) {
+      // AuthContext surfaces the error via the error banner above the
+      // button — we just log here for debug. Common causes:
+      //   • Popup blocked by browser → check address-bar icon
+      //   • Domain not in Firebase Auth Authorized Domains list
+      //   • User closed the popup
+      console.error("[Login] sign-in failed:", err);
     } finally {
       setSigningIn(false);
     }

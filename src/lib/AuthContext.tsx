@@ -138,15 +138,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
           const teacherInfo = teacherDoc.data();
 
           // STAGE GATE: pre-primary dashboard only allows teachers whose
-          // assignedClass contains Playgroup/Nursery/LKG/UKG. K-12 teachers
-          // are redirected to the regular teacher-dashboard.
-          if (!isPrePrimaryClass(teacherInfo.assignedClass as string | undefined)) {
+          //   (a) `stage` field equals "pre_primary"  — canonical (set by
+          //       principal-dashboard PreTeachers invite flow), OR
+          //   (b) `assignedClass` contains a recognised pre-primary token
+          //       — legacy/manual fallback for teachers added directly.
+          // (a) is the authoritative path; (b) covers custom level names
+          // (e.g. "Toddler Group", "Mini KG") that the principal added
+          // via the configurable class-levels feature.
+          const stageIsPp = teacherInfo.stage === "pre_primary";
+          const classIsPp = isPrePrimaryClass(
+            teacherInfo.assignedClass as string | undefined
+          );
+          if (!stageIsPp && !classIsPp) {
             await signOut(auth);
             setUser(null);
             setTeacherData(null);
             setError(
-              "This dashboard is for Pre-Primary teachers only (Playgroup, Nursery, LKG, UKG). " +
-                "Please use the K-12 Teacher Dashboard for your class."
+              `This dashboard is for Pre-Primary teachers only (Playgroup, Nursery, LKG, UKG, or custom pre-primary levels). ` +
+                `Your assigned class "${teacherInfo.assignedClass || "—"}" is not pre-primary. ` +
+                `Use the K-12 Teacher Dashboard instead, or ask your principal to invite you via the Pre-Teachers page.`
             );
             setLoading(false);
             return;
@@ -211,6 +221,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const loginWithGoogle = async () => {
     const provider = new GoogleAuthProvider();
+    // FORCE the Google account selector to appear every time, even when the
+    // browser has a single cached Google session. Without this Firebase
+    // silently auto-signs in with that cached account → user sees no popup
+    // and feels nothing happened.
+    provider.setCustomParameters({ prompt: "select_account" });
     try {
       setError(null);
       await signInWithPopup(auth, provider);
@@ -220,11 +235,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         code === "auth/popup-closed-by-user" ||
         code === "auth/cancelled-popup-request" ||
         code === "auth/popup-blocked";
-      if (!userCancelled) {
+      // Surface the popup-blocked case explicitly — users often miss the
+      // tiny browser address-bar icon and assume the app is broken.
+      if (code === "auth/popup-blocked") {
+        setError(
+          "Your browser blocked the Google sign-in popup. Allow popups for this site (icon next to the URL bar) and try again."
+        );
+      } else if (code === "auth/unauthorized-domain") {
+        setError(
+          "This domain is not authorized in Firebase Auth. Add it to Authorized Domains in the Firebase Console → Authentication → Settings."
+        );
+      } else if (!userCancelled) {
         const message =
           err instanceof Error ? err.message : "Sign-in failed. Please try again.";
         setError(message);
       }
+      // Always log for debug — popup failures are infamously cryptic.
+      console.error("[Auth] signInWithPopup failed:", code, err);
       throw err;
     }
   };
