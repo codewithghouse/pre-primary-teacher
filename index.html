@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover"
+    />
+
+    <title>Edullent — Pre-Primary Teacher</title>
+    <meta
+      name="description"
+      content="Edullent dashboard for Playgroup, Nursery, LKG, UKG teachers — attendance, mood, daily activities, milestones, parent communication."
+    />
+    <meta name="author" content="Edullent" />
+
+    <!-- PWA / theme -->
+    <meta name="theme-color" content="#1e3272" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="application-name" content="Edullent Pre-Primary" />
+    <meta name="format-detection" content="telephone=no" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Pre-Primary" />
+
+    <link rel="icon" type="image/png" href="/edullent-icon.png" />
+
+    <!-- Native-app feel: prevent overscroll, zoom, white flash -->
+    <style>
+      html {
+        overscroll-behavior: none;
+        -webkit-text-size-adjust: 100%;
+        text-size-adjust: 100%;
+        background: #1e3272;
+      }
+      body {
+        overscroll-behavior: none;
+        -webkit-overflow-scrolling: touch;
+        -webkit-tap-highlight-color: transparent;
+        -webkit-touch-callout: none;
+        background: #1e3272;
+        margin: 0;
+      }
+      #root:empty::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        background: #1e3272;
+        z-index: 9999;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+    <script>
+      // Block zoom gestures (pinch, double-tap, Ctrl+wheel) — matches teacher-dashboard pattern
+      document.addEventListener(
+        "touchstart",
+        function (e) {
+          if (e.touches.length > 1) e.preventDefault();
+        },
+        { passive: false }
+      );
+      document.addEventListener(
+        "touchmove",
+        function (e) {
+          if (e.touches.length > 1) e.preventDefault();
+        },
+        { passive: false }
+      );
+      var lastTouchEnd = 0;
+      document.addEventListener(
+        "touchend",
+        function (e) {
+          var now = Date.now();
+          if (now - lastTouchEnd <= 300) e.preventDefault();
+          lastTouchEnd = now;
+        },
+        { passive: false }
+      );
+      document.addEventListener(
+        "wheel",
+        function (e) {
+          if (e.ctrlKey) e.preventDefault();
+        },
+        { passive: false }
+      );
+      document.addEventListener("keydown", function (e) {
+        if (
+          (e.ctrlKey || e.metaKey) &&
+          (e.key === "+" || e.key === "-" || e.key === "=" || e.key === "0")
+        ) {
+          e.preventDefault();
+        }
+      });
+    </script>
+  </body>
+</html>
