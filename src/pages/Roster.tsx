@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import {
   Phone,
   AlertTriangle,
@@ -9,10 +10,18 @@ import {
   X,
   ShieldAlert,
   Loader2,
+  Send,
+  Check,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTeacherClass } from "@/hooks/useTeacherClass";
 import { useClassRoster, type RosterChild } from "@/hooks/useClassRoster";
+import { auditedUpdate } from "@/lib/auditedWrites";
+import { doc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
+import { toast } from "sonner";
+
+const PRE_PRIMARY_PARENT_URL = "https://pre-parent-dashboard.vercel.app";
 
 export default function Roster() {
   const [query, setQuery] = useState("");
@@ -82,6 +91,143 @@ export default function Roster() {
       )}
 
       {open && <ChildSheet child={open} onClose={() => setOpenChildId(null)} />}
+    </div>
+  );
+}
+
+/**
+ * Inline parent-invite mini-form inside ChildSheet. Writes parentName + parentEmail
+ * onto /students/{id} via auditedUpdate. We don't send email from this app
+ * (no /api/send-email endpoint deployed on the teacher app); we just save the
+ * record and copy the parent URL to clipboard so the teacher can share it via
+ * WhatsApp / SMS / verbally. Real email delivery lives in principal-dashboard's
+ * PreParents page.
+ */
+function ParentInviteRow({ child }: { child: RosterChild }) {
+  const [editing, setEditing] = useState(false);
+  const [parentName, setParentName] = useState(child.parentName || "");
+  const [parentEmail, setParentEmail] = useState(child.parentEmail || "");
+  const [saving, setSaving] = useState(false);
+  const alreadyLinked = !!child.parentEmail;
+
+  const copyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(PRE_PRIMARY_PARENT_URL);
+      toast.success("Parent app link copied 📋");
+    } catch {
+      toast.message(`Parent app: ${PRE_PRIMARY_PARENT_URL}`);
+    }
+  };
+
+  const save = async () => {
+    const cleanEmail = parentEmail.trim().toLowerCase();
+    const cleanName = parentName.trim();
+    if (!cleanEmail) {
+      toast.error("Parent email is required.");
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+      toast.error("Enter a valid email address.");
+      return;
+    }
+    setSaving(true);
+    try {
+      await auditedUpdate(doc(db, "students", child.id), {
+        parentEmail: cleanEmail,
+        parentName: cleanName || child.parentName || "",
+      });
+      toast.success(
+        `Saved. Share ${PRE_PRIMARY_PARENT_URL} with the parent — they'll sign in with this email.`
+      );
+      setEditing(false);
+    } catch (err) {
+      console.error("[Roster] parent invite save failed:", err);
+      toast.error("Save failed. Check permissions & try again.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (!editing) {
+    return (
+      <div className="space-y-2">
+        {alreadyLinked && (
+          <div className="flex items-center gap-1.5 text-xs text-edu-green font-semibold">
+            <Check className="w-3.5 h-3.5" />
+            Parent linked: {child.parentEmail}
+          </div>
+        )}
+        <div className="flex gap-2">
+          <Button
+            type="button"
+            variant={alreadyLinked ? "outline" : "default"}
+            size="sm"
+            onClick={() => setEditing(true)}
+            className="flex-1"
+          >
+            <Send className="w-3.5 h-3.5" />
+            {alreadyLinked ? "Update parent contact" : "Invite parent"}
+          </Button>
+          {alreadyLinked && (
+            <Button type="button" variant="outline" size="sm" onClick={copyLink}>
+              Copy link
+            </Button>
+          )}
+        </div>
+        <p className="text-[10px] text-muted-foreground leading-relaxed">
+          Saves the parent's email to {child.name.split(" ")[0]}'s profile.
+          Parent then signs in with Google at{" "}
+          <span className="text-edu-blue font-semibold">
+            {PRE_PRIMARY_PARENT_URL.replace("https://", "")}
+          </span>
+          . (Real email invites are sent by the Principal from their dashboard.)
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      <Input
+        placeholder="Parent's name (optional)"
+        value={parentName}
+        onChange={(e) => setParentName(e.target.value)}
+        className="h-9 text-xs"
+      />
+      <Input
+        type="email"
+        placeholder="parent.email@example.com"
+        value={parentEmail}
+        onChange={(e) => setParentEmail(e.target.value)}
+        className="h-9 text-xs"
+        autoFocus
+      />
+      <div className="flex gap-2">
+        <Button
+          type="button"
+          variant="success"
+          size="sm"
+          onClick={save}
+          disabled={saving}
+          className="flex-1"
+        >
+          {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+          Save
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            setEditing(false);
+            setParentName(child.parentName || "");
+            setParentEmail(child.parentEmail || "");
+          }}
+          disabled={saving}
+        >
+          Cancel
+        </Button>
+      </div>
     </div>
   );
 }
@@ -247,6 +393,13 @@ function ChildSheet({ child, onClose }: { child: RosterChild; onClose: () => voi
               <p className="text-xs italic text-foreground/80">{child.comfortCue}</p>
             </Section>
           )}
+
+          <Section
+            title="Parent invite"
+            icon={<Send className="w-3.5 h-3.5" />}
+          >
+            <ParentInviteRow child={child} />
+          </Section>
         </div>
       </div>
     </div>
