@@ -16,6 +16,10 @@ import {
   CheckCircle2,
   Sparkles,
   ShieldCheck,
+  Droplet,
+  Utensils,
+  BookOpen,
+  Star,
 } from "lucide-react";
 import { format } from "date-fns";
 import { useTeacherClass } from "@/hooks/useTeacherClass";
@@ -179,6 +183,17 @@ export default function Home() {
             label="Incident"
             color="bg-edu-red"
           />
+        </div>
+      </section>
+
+      {/* Care & Routine */}
+      <section>
+        <h2 className="text-sm font-bold text-edu-navy mb-2 px-1">Care &amp; Routine</h2>
+        <div className="grid grid-cols-4 gap-3">
+          <QuickAction icon={Droplet} label="Diaper" color="bg-edu-blue" href="/diaper" />
+          <QuickAction icon={Utensils} label="Meals" color="bg-edu-orange" href="/meals-nap" />
+          <QuickAction icon={Star} label="Behavior" color="bg-edu-green" href="/behavior" />
+          <QuickAction icon={BookOpen} label="Milestones" color="bg-edu-navy" href="/milestones" />
         </div>
       </section>
     </div>

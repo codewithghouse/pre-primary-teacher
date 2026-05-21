@@ -29,3 +29,11 @@ export function ppDailyDocId(date: string, classId: string): string {
 export function ppPickupDocId(date: string, classId: string): string {
   return `${date}_${classId}`;
 }
+
+export function ppDiaperDocId(date: string, classId: string): string {
+  return `${date}_${classId}`;
+}
+
+export function ppMealsNapsDocId(date: string, classId: string): string {
+  return `${date}_${classId}`;
+}

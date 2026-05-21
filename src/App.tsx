@@ -37,6 +37,10 @@ const Roster = lazyWithRetry(() => import("./pages/Roster"));
 const DailyActivities = lazyWithRetry(() => import("./pages/DailyActivities"));
 const PickupVerification = lazyWithRetry(() => import("./pages/PickupVerification"));
 const Profile = lazyWithRetry(() => import("./pages/Profile"));
+const DiaperLog = lazyWithRetry(() => import("./pages/DiaperLog"));
+const MealsNap = lazyWithRetry(() => import("./pages/MealsNap"));
+const BehaviorNotes = lazyWithRetry(() => import("./pages/BehaviorNotes"));
+const Milestones = lazyWithRetry(() => import("./pages/Milestones"));
 const NotFound = lazyWithRetry(() => import("./pages/NotFound"));
 // /setup is a public bootstrap route — bypasses AuthContext stage gate so a
 // principal can sign in and seed a class + teacher + students without first
@@ -109,6 +113,10 @@ const AppRoutes = () => {
           <Route path="/roster" element={<Roster />} />
           <Route path="/activities" element={<DailyActivities />} />
           <Route path="/pickup" element={<PickupVerification />} />
+          <Route path="/diaper" element={<DiaperLog />} />
+          <Route path="/meals-nap" element={<MealsNap />} />
+          <Route path="/behavior" element={<BehaviorNotes />} />
+          <Route path="/milestones" element={<Milestones />} />
           <Route path="/profile" element={<Profile />} />
         </Route>
         <Route path="*" element={<NotFound />} />
