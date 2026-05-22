@@ -12,6 +12,7 @@ import {
   BookOpen,
   Megaphone,
   Image as ImageIcon,
+  Calendar as CalendarIcon,
   User as UserIcon,
   Sprout,
   X,
@@ -64,6 +65,7 @@ const GROUPS: NavGroup[] = [
     label: "Communication",
     items: [
       { to: "/notices", label: "Class Notices", icon: Megaphone },
+      { to: "/events", label: "Class Events", icon: CalendarIcon },
       { to: "/photos", label: "Photo Studio", icon: ImageIcon },
     ],
   },
