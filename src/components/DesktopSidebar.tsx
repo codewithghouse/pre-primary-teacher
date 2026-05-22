@@ -6,6 +6,7 @@ import {
   Camera,
   Users,
   ShieldCheck,
+  ShieldAlert,
   Droplet,
   Utensils,
   Star,
@@ -13,6 +14,8 @@ import {
   Megaphone,
   Image as ImageIcon,
   Calendar as CalendarIcon,
+  PhoneCall,
+  Settings as SettingsIcon,
   User as UserIcon,
   Sprout,
   X,
@@ -45,6 +48,8 @@ const GROUPS: NavGroup[] = [
     items: [
       { to: "/roster", label: "Roster", icon: Users },
       { to: "/pickup", label: "Pickup Verification", icon: ShieldCheck },
+      { to: "/safety", label: "Safety Dashboard", icon: ShieldAlert },
+      { to: "/parents", label: "Parent Directory", icon: PhoneCall },
     ],
   },
   {
@@ -67,6 +72,12 @@ const GROUPS: NavGroup[] = [
       { to: "/notices", label: "Class Notices", icon: Megaphone },
       { to: "/events", label: "Class Events", icon: CalendarIcon },
       { to: "/photos", label: "Photo Studio", icon: ImageIcon },
+    ],
+  },
+  {
+    label: "Setup",
+    items: [
+      { to: "/settings", label: "Class Settings", icon: SettingsIcon },
     ],
   },
 ];
