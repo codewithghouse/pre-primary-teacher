@@ -68,6 +68,20 @@ export default function Photos() {
     return slots.find((s) => s.status === "in_progress") || null;
   }, [activities]);
 
+  // Stats — MUST live above early returns or React throws
+  // "Rendered more hooks than during the previous render" when classLoading
+  // flips from true → false.
+  const stats = useMemo(() => {
+    const taggedCount = new Set(
+      photos.flatMap((p) => p.taggedStudentIds)
+    ).size;
+    return {
+      total: photos.length,
+      taggedKids: taggedCount,
+      rosterSize: roster.length,
+    };
+  }, [photos, roster]);
+
   // Revoke preview URLs on unmount / change
   useEffect(() => {
     return () => {
@@ -195,17 +209,6 @@ export default function Photos() {
       toast.error(`Could not delete: ${msg.slice(0, 120)}`);
     }
   };
-
-  const stats = useMemo(() => {
-    const taggedCount = new Set(
-      photos.flatMap((p) => p.taggedStudentIds)
-    ).size;
-    return {
-      total: photos.length,
-      taggedKids: taggedCount,
-      rosterSize: roster.length,
-    };
-  }, [photos, roster]);
 
   return (
     <div
