@@ -131,7 +131,8 @@ export default function Milestones() {
       setDialog(false);
     } catch (e) {
       console.error("[Milestones] addMilestone:", e);
-      toast.error("Could not save milestone.");
+      const msg = e instanceof Error ? e.message : String(e);
+      toast.error(`Could not save milestone: ${msg.slice(0, 120)}`);
     } finally {
       setSaving(false);
     }

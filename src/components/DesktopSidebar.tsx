@@ -10,6 +10,7 @@ import {
   Utensils,
   Star,
   BookOpen,
+  Megaphone,
   User as UserIcon,
   Sprout,
   X,
@@ -56,6 +57,12 @@ const GROUPS: NavGroup[] = [
     items: [
       { to: "/behavior", label: "Behavior Notes", icon: Star },
       { to: "/milestones", label: "Milestones", icon: BookOpen },
+    ],
+  },
+  {
+    label: "Communication",
+    items: [
+      { to: "/notices", label: "Class Notices", icon: Megaphone },
     ],
   },
 ];

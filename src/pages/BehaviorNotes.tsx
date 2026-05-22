@@ -149,7 +149,8 @@ export default function BehaviorNotes() {
       setDialog(false);
     } catch (e) {
       console.error("[BehaviorNotes] addNote:", e);
-      toast.error("Could not save note.");
+      const msg = e instanceof Error ? e.message : String(e);
+      toast.error(`Could not save note: ${msg.slice(0, 120)}`);
     } finally {
       setSaving(false);
     }

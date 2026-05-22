@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import {
   doc,
+  getDocFromServer,
   onSnapshot,
   serverTimestamp,
   type DocumentData,
@@ -101,8 +102,17 @@ export function usePPMealsNaps(classId: string | null | undefined) {
     const unsub = onSnapshot(
       ref,
       (snap) => {
-        if (snap.exists()) {
-          setData(snap.data() as PPMealsNaps);
+        const d = snap.exists() ? (snap.data() as PPMealsNaps) : null;
+        console.log("[usePPMealsNaps] snapshot", {
+          exists: snap.exists(),
+          hasPendingWrites: snap.metadata.hasPendingWrites,
+          fromCache: snap.metadata.fromCache,
+          meals: d?.meals?.length ?? 0,
+          naps: d?.naps?.length ?? 0,
+          docSchoolId: d?.schoolId,
+        });
+        if (d) {
+          setData(d);
         } else {
           setData({
             date: today,
@@ -115,7 +125,7 @@ export function usePPMealsNaps(classId: string | null | undefined) {
         setLoading(false);
       },
       (err) => {
-        console.error("[usePPMealsNaps]", err);
+        console.error("[usePPMealsNaps] listener error:", err);
         setLoading(false);
       }
     );
@@ -126,7 +136,8 @@ export function usePPMealsNaps(classId: string | null | undefined) {
     async (next: Partial<PPMealsNaps>) => {
       if (!classId || !teacherData?.schoolId)
         throw new Error("Missing context");
-      const ref = doc(db, "pp_meals_naps", ppMealsNapsDocId(today, classId));
+      const docId = ppMealsNapsDocId(today, classId);
+      const ref = doc(db, "pp_meals_naps", docId);
       const payload: DocumentData = {
         date: today,
         classId,
@@ -138,9 +149,34 @@ export function usePPMealsNaps(classId: string | null | undefined) {
         ...next,
         updatedAt: serverTimestamp(),
       };
+      console.log("[usePPMealsNaps] writing", {
+        docPath: `pp_meals_naps/${docId}`,
+        schoolId: teacherData.schoolId,
+        classId,
+        mealsCount: (payload.meals as MealEntry[]).length,
+        napsCount: (payload.naps as NapEntry[]).length,
+      });
       await auditedSet(ref, payload, { merge: true });
     },
     [classId, teacherData, today, data]
+  );
+
+  const verifyServer = useCallback(
+    async (
+      check: (data: PPMealsNaps | undefined) => string | null
+    ): Promise<void> => {
+      if (!classId) return;
+      const ref = doc(db, "pp_meals_naps", ppMealsNapsDocId(today, classId));
+      const snap = await getDocFromServer(ref);
+      const d = snap.exists() ? (snap.data() as PPMealsNaps) : undefined;
+      const failureReason = check(d);
+      if (failureReason) {
+        throw new Error(
+          `${failureReason} Most likely cause: Firestore rules rejected the write. Check DevTools console.`
+        );
+      }
+    },
+    [classId, today]
   );
 
   const addMeal = useCallback(
@@ -166,9 +202,14 @@ export function usePPMealsNaps(classId: string | null | undefined) {
         recordedBy: teacherData?.id || "",
       };
       await upsert({ meals: [...meals, entry] });
+      await verifyServer((d) =>
+        d?.meals?.some((m) => m.id === entry.id)
+          ? null
+          : "Server did not persist the meal entry."
+      );
       return entry;
     },
-    [data, upsert, teacherData?.id]
+    [data, upsert, teacherData?.id, verifyServer]
   );
 
   const startNap = useCallback(
@@ -183,9 +224,14 @@ export function usePPMealsNaps(classId: string | null | undefined) {
         recordedBy: teacherData?.id || "",
       };
       await upsert({ naps: [...naps, entry] });
+      await verifyServer((d) =>
+        d?.naps?.some((n) => n.id === entry.id)
+          ? null
+          : "Server did not persist the nap start."
+      );
       return entry;
     },
-    [data, upsert, teacherData?.id]
+    [data, upsert, teacherData?.id, verifyServer]
   );
 
   const endNap = useCallback(
@@ -200,8 +246,12 @@ export function usePPMealsNaps(classId: string | null | undefined) {
         return { ...n, endTime: end, durationMin: dur };
       });
       await upsert({ naps: next });
+      await verifyServer((d) => {
+        const n = d?.naps?.find((x) => x.id === napId);
+        return n?.endTime ? null : "Server did not persist the nap end.";
+      });
     },
-    [data, upsert]
+    [data, upsert, verifyServer]
   );
 
   const undoLastMeal = useCallback(

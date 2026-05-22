@@ -64,7 +64,16 @@ export const auth = getAuth(app);
 // Critical for offline attendance / activity log writes when network drops
 // mid-class. Multi-tab manager keeps reads in sync if the teacher opens the
 // dashboard in two tabs.
+//
+// ignoreUndefinedProperties=true — strips undefined values from writes
+// (instead of throwing). This matters for entries like
+// `{ note: args.note?.trim() || undefined }` in pp_diaper_logs /
+// pp_meals_naps — without this flag, the entire setDoc() rejects with
+// "Unsupported field value: undefined" and the user sees
+// "Could not save". With it set, undefined keys are simply omitted from
+// the written doc, which is the intended behaviour for optional fields.
 export const db = initializeFirestore(app, {
+  ignoreUndefinedProperties: true,
   localCache: persistentLocalCache({
     tabManager: persistentMultipleTabManager(),
   }),

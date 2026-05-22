@@ -167,7 +167,8 @@ export default function DiaperLog() {
       if (closeSheet) setActiveChildId(null);
     } catch (err) {
       console.error("[DiaperLog] addEntry failed:", err);
-      toast.error("Could not save. Check connection.");
+      const msg = err instanceof Error ? err.message : String(err);
+      toast.error(`Could not save: ${msg.slice(0, 120)}`);
     } finally {
       setBusyType(null);
     }
@@ -179,7 +180,8 @@ export default function DiaperLog() {
       toast.message(`Removed last entry for ${child.name.split(" ")[0]}`);
     } catch (err) {
       console.error("[DiaperLog] undoLast failed:", err);
-      toast.error("Could not undo.");
+      const msg = err instanceof Error ? err.message : String(err);
+      toast.error(`Could not undo: ${msg.slice(0, 120)}`);
     }
   };
 

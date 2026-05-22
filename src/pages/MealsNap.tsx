@@ -149,7 +149,9 @@ export default function MealsNap() {
         await endNap(existing.id);
         toast.success(`Nap ended for ${child.name.split(" ")[0]}`);
       } catch (e) {
-        toast.error("Could not end nap");
+        console.error("[MealsNap] endNap:", e);
+        const msg = e instanceof Error ? e.message : String(e);
+        toast.error(`Could not end nap: ${msg.slice(0, 120)}`);
       } finally {
         setBusy(false);
       }
@@ -160,7 +162,9 @@ export default function MealsNap() {
       await startNap({ studentId: child.id, studentName: child.name });
       toast.success(`Nap started for ${child.name.split(" ")[0]} 😴`);
     } catch (e) {
-      toast.error("Could not start nap");
+      console.error("[MealsNap] startNap:", e);
+      const msg = e instanceof Error ? e.message : String(e);
+      toast.error(`Could not start nap: ${msg.slice(0, 120)}`);
     } finally {
       setBusy(false);
     }
@@ -192,7 +196,8 @@ export default function MealsNap() {
       setSheet(null);
     } catch (e) {
       console.error("[MealsNap] addMeal:", e);
-      toast.error("Could not save meal.");
+      const msg = e instanceof Error ? e.message : String(e);
+      toast.error(`Could not save meal: ${msg.slice(0, 120)}`);
     } finally {
       setBusy(false);
     }
