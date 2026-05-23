@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -12,6 +13,7 @@ import {
   Loader2,
   Send,
   Check,
+  UserCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTeacherClass } from "@/hooks/useTeacherClass";
@@ -322,6 +324,14 @@ function ChildSheet({ child, onClose }: { child: RosterChild; onClose: () => voi
         </div>
 
         <div className="px-4 py-4 space-y-4">
+          <Link
+            to={`/child/${child.id}`}
+            className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl bg-edu-navy text-white text-sm font-bold active:scale-[0.98] transition"
+          >
+            <UserCircle className="w-4 h-4" />
+            Open full profile
+          </Link>
+
           {((child.allergies && child.allergies.length > 0) || child.medical) && (
             <Card className="bg-edu-light-red/30 border-edu-red/30">
               <CardContent className="p-3">

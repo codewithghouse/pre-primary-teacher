@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { Loader2, Plus, Sparkles, X, Search } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
@@ -245,9 +246,12 @@ export default function Milestones() {
                 <CardContent className="p-3 space-y-2">
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
-                      <p className="text-sm font-bold text-edu-navy truncate">
+                      <Link
+                        to={`/child/${m.studentId}`}
+                        className="text-sm font-bold text-edu-navy truncate block hover:underline"
+                      >
                         {m.studentName}
-                      </p>
+                      </Link>
                       <p className="text-[10px] text-muted-foreground">
                         {format(new Date(m.recordedAt), "d MMM · h:mm a")} ·{" "}
                         {m.term}

@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import {
   Loader2,
   Plus,
@@ -260,9 +261,12 @@ export default function BehaviorNotes() {
                   <CardContent className="p-3 space-y-2">
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
-                        <p className="text-sm font-bold text-edu-navy truncate">
+                        <Link
+                          to={`/child/${n.studentId}`}
+                          className="text-sm font-bold text-edu-navy truncate block hover:underline"
+                        >
                           {TYPE_EMOJI[n.type]} {n.studentName}
-                        </p>
+                        </Link>
                         <p className="text-[10px] text-muted-foreground">
                           {format(new Date(n.createdAt), "d MMM · h:mm a")} ·
                           by {n.createdByName || "Teacher"}
