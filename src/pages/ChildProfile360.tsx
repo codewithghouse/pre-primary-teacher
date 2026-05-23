@@ -737,6 +737,29 @@ export default function ChildProfile360() {
           <ArrowLeft size={isDesktop ? 14 : 13} />
           {isDesktop ? "BACK TO ROSTER" : "BACK"}
         </button>
+        <button
+          type="button"
+          onClick={() =>
+            navigate(`/incidents?child=${encodeURIComponent(child.id)}&open=1`)
+          }
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 6,
+            padding: isDesktop ? "8px 16px" : "7px 12px",
+            borderRadius: 10,
+            border: "none",
+            background: "linear-gradient(135deg, #DC2626, #EF4444)",
+            color: "#fff",
+            fontSize: isDesktop ? 13 : 11,
+            fontWeight: 700,
+            cursor: "pointer",
+            boxShadow: "0 6px 18px rgba(220,38,38,0.22)",
+          }}
+        >
+          <ShieldAlert size={isDesktop ? 14 : 13} />
+          {isDesktop ? "LOG INCIDENT" : "INCIDENT"}
+        </button>
       </div>
 
       {/* Hero — 3-col on desktop (left stack | photo center | right stack), single column on mobile (photo first) */}

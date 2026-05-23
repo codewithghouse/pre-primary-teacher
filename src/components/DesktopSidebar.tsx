@@ -49,6 +49,7 @@ const GROUPS: NavGroup[] = [
       { to: "/roster", label: "Roster", icon: Users },
       { to: "/pickup", label: "Pickup Verification", icon: ShieldCheck },
       { to: "/safety", label: "Safety Dashboard", icon: ShieldAlert },
+      { to: "/incidents", label: "Incidents", icon: ShieldAlert },
       { to: "/parents", label: "Parent Directory", icon: PhoneCall },
     ],
   },
