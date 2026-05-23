@@ -1,6 +1,6 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { Loader2, Plus, Sparkles, X, Search } from "lucide-react";
+import { Loader2, Plus, Sparkles, X, Search, Filter } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";
@@ -34,6 +34,23 @@ export default function Milestones() {
   const [filterChild, setFilterChild] = useState<string>("");
   const [filterDomain, setFilterDomain] = useState<Domain | "">("");
   const [dialog, setDialog] = useState(false);
+  // Marker for the most recently saved observation. Drives the brief
+  // green-ring pulse on the freshly added card so the teacher visibly
+  // confirms the save landed without scanning the list.
+  const [justSavedAt, setJustSavedAt] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (justSavedAt === null) return;
+    const t = setTimeout(() => setJustSavedAt(null), 2500);
+    return () => clearTimeout(t);
+  }, [justSavedAt]);
+
+  const filtersActive = !!(filterChild || filterDomain || search.trim());
+  const clearFilters = () => {
+    setFilterChild("");
+    setFilterDomain("");
+    setSearch("");
+  };
 
   const [studentId, setStudentId] = useState("");
   const [domain, setDomain] = useState<Domain>("cognitive");
@@ -130,6 +147,14 @@ export default function Milestones() {
         `${DOMAIN_EMOJI[domain]} ${DOMAIN_LABEL[domain]} milestone saved for ${child.name.split(" ")[0]}`
       );
       setDialog(false);
+      // Make sure the freshly-saved entry is unambiguously visible: drop
+      // any active filters (left over from a previous browsing session) and
+      // jump back to the top of the list where the new card lands.
+      clearFilters();
+      setJustSavedAt(Date.now());
+      if (typeof window !== "undefined") {
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      }
     } catch (e) {
       console.error("[Milestones] addMilestone:", e);
       const msg = e instanceof Error ? e.message : String(e);
@@ -224,14 +249,53 @@ export default function Milestones() {
         </select>
       </div>
 
+      {filtersActive && (
+        <div className="flex items-center justify-between gap-2 -mt-1">
+          <p className="text-[11px] text-muted-foreground inline-flex items-center gap-1.5">
+            <Filter className="w-3 h-3" />
+            Showing <span className="font-bold text-edu-navy">{filtered.length}</span> of {milestones.length}
+            {filterChild && roster.find((r) => r.id === filterChild) && (
+              <span className="px-1.5 py-0.5 rounded bg-secondary text-edu-navy font-semibold">
+                {roster.find((r) => r.id === filterChild)?.name.split(" ")[0]}
+              </span>
+            )}
+            {filterDomain && (
+              <span className="px-1.5 py-0.5 rounded bg-secondary text-edu-navy font-semibold">
+                {DOMAIN_EMOJI[filterDomain]} {DOMAIN_LABEL[filterDomain]}
+              </span>
+            )}
+          </p>
+          <button
+            type="button"
+            onClick={clearFilters}
+            className="text-[11px] font-bold text-edu-blue hover:underline shrink-0"
+          >
+            Clear filters
+          </button>
+        </div>
+      )}
+
       {filtered.length === 0 ? (
         <Card>
           <CardContent className="p-8 text-center">
             <div className="text-3xl mb-2">🌱</div>
-            <p className="text-sm font-bold text-edu-navy">No milestones yet</p>
-            <p className="text-xs text-muted-foreground mt-1">
-              Tap + to record an observation against any of the 5 NEP 2020 domains.
+            <p className="text-sm font-bold text-edu-navy">
+              {filtersActive ? "No matches — clear filters to see all" : "No milestones yet"}
             </p>
+            <p className="text-xs text-muted-foreground mt-1">
+              {filtersActive
+                ? "Your saved entry might be hidden by an active filter."
+                : "Tap + to record an observation against any of the 5 NEP 2020 domains."}
+            </p>
+            {filtersActive && (
+              <button
+                type="button"
+                onClick={clearFilters}
+                className="mt-3 h-9 px-4 rounded-xl bg-edu-navy text-white text-xs font-bold"
+              >
+                Clear filters
+              </button>
+            )}
           </CardContent>
         </Card>
       ) : (
@@ -240,9 +304,14 @@ export default function Milestones() {
             isDesktop ? "grid grid-cols-2 xl:grid-cols-3 gap-3" : "space-y-2"
           )}
         >
-          {filtered.map((m) => (
+          {filtered.map((m, i) => (
             <li key={m.id}>
-              <Card>
+              <Card
+                className={cn(
+                  justSavedAt !== null && i === 0 &&
+                    "ring-2 ring-edu-green ring-offset-2 animate-pulse"
+                )}
+              >
                 <CardContent className="p-3 space-y-2">
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">

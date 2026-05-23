@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   Loader2,
@@ -9,6 +9,7 @@ import {
   Lock,
   X,
   Search,
+  Filter,
 } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
@@ -61,6 +62,20 @@ export default function BehaviorNotes() {
   const [filterChild, setFilterChild] = useState<string>("");
   const [filterTier, setFilterTier] = useState<BehaviorTier | "">("");
   const [dialog, setDialog] = useState(false);
+  const [justSavedAt, setJustSavedAt] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (justSavedAt === null) return;
+    const t = setTimeout(() => setJustSavedAt(null), 2500);
+    return () => clearTimeout(t);
+  }, [justSavedAt]);
+
+  const filtersActive = !!(filterChild || filterTier || search.trim());
+  const clearFilters = () => {
+    setFilterChild("");
+    setFilterTier("");
+    setSearch("");
+  };
 
   const [studentId, setStudentId] = useState("");
   const [content, setContent] = useState("");
@@ -148,6 +163,13 @@ export default function BehaviorNotes() {
       });
       toast.success(`Note saved for ${child.name.split(" ")[0]}`);
       setDialog(false);
+      // Drop any active filters so the freshly-saved note isn't hidden, and
+      // jump to top of list where it lands.
+      clearFilters();
+      setJustSavedAt(Date.now());
+      if (typeof window !== "undefined") {
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      }
     } catch (e) {
       console.error("[BehaviorNotes] addNote:", e);
       const msg = e instanceof Error ? e.message : String(e);
@@ -237,14 +259,53 @@ export default function BehaviorNotes() {
         </select>
       </div>
 
+      {filtersActive && (
+        <div className="flex items-center justify-between gap-2 -mt-1">
+          <p className="text-[11px] text-muted-foreground inline-flex items-center gap-1.5">
+            <Filter className="w-3 h-3" />
+            Showing <span className="font-bold text-edu-navy">{filtered.length}</span> of {notes.length}
+            {filterChild && roster.find((r) => r.id === filterChild) && (
+              <span className="px-1.5 py-0.5 rounded bg-secondary text-edu-navy font-semibold">
+                {roster.find((r) => r.id === filterChild)?.name.split(" ")[0]}
+              </span>
+            )}
+            {filterTier && (
+              <span className="px-1.5 py-0.5 rounded bg-secondary text-edu-navy font-semibold">
+                {BEHAVIOR_TIER_LABEL[filterTier]}
+              </span>
+            )}
+          </p>
+          <button
+            type="button"
+            onClick={clearFilters}
+            className="text-[11px] font-bold text-edu-blue hover:underline shrink-0"
+          >
+            Clear filters
+          </button>
+        </div>
+      )}
+
       {filtered.length === 0 ? (
         <Card>
           <CardContent className="p-8 text-center">
             <div className="text-3xl mb-2">📝</div>
-            <p className="text-sm font-bold text-edu-navy">No notes yet</p>
-            <p className="text-xs text-muted-foreground mt-1">
-              Tap the + button to record an observation about a child.
+            <p className="text-sm font-bold text-edu-navy">
+              {filtersActive ? "No matches — clear filters to see all" : "No notes yet"}
             </p>
+            <p className="text-xs text-muted-foreground mt-1">
+              {filtersActive
+                ? "Your saved note might be hidden by an active filter."
+                : "Tap the + button to record an observation about a child."}
+            </p>
+            {filtersActive && (
+              <button
+                type="button"
+                onClick={clearFilters}
+                className="mt-3 h-9 px-4 rounded-xl bg-edu-navy text-white text-xs font-bold"
+              >
+                Clear filters
+              </button>
+            )}
           </CardContent>
         </Card>
       ) : (
@@ -253,11 +314,16 @@ export default function BehaviorNotes() {
             isDesktop ? "grid grid-cols-2 xl:grid-cols-3 gap-3" : "space-y-2"
           )}
         >
-          {filtered.map((n) => {
+          {filtered.map((n, i) => {
             const TierIcon = TIER_ICON[n.tier];
             return (
               <li key={n.id}>
-                <Card>
+                <Card
+                  className={cn(
+                    justSavedAt !== null && i === 0 &&
+                      "ring-2 ring-edu-green ring-offset-2 animate-pulse"
+                  )}
+                >
                   <CardContent className="p-3 space-y-2">
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
