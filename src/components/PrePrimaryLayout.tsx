@@ -24,7 +24,7 @@ export function PrePrimaryLayout() {
   }, [sidebarOpen]);
 
   return (
-    <div className="min-h-screen bg-secondary/30 flex">
+    <div className="min-h-screen bg-[#EEF4FF] flex">
       {/* Sidebar: slide-in drawer on mobile, sticky on desktop */}
       <DesktopSidebar
         isOpen={sidebarOpen}
