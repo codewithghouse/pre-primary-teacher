@@ -17,15 +17,22 @@ import {
   Users,
   CalendarDays,
   Activity,
+  GraduationCap,
 } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { ThemedCard, KpiCard } from "@/components/ThemedCard";
 import { cn } from "@/lib/utils";
 import { useTeacherClass } from "@/hooks/useTeacherClass";
-import { useClassRoster, type RosterChild } from "@/hooks/useClassRoster";
+import { useClassRoster } from "@/hooks/useClassRoster";
 import { useTodayAttendance, type MoodKey } from "@/hooks/useTodayAttendance";
-import { usePPMealsNaps, MEAL_TYPE_EMOJI, MEAL_TYPE_LABEL, PORTION_LABEL } from "@/hooks/usePPMealsNaps";
-import { usePPDiaperLogs, DIAPER_TYPE_EMOJI, DIAPER_TYPE_LABEL } from "@/hooks/usePPDiaperLogs";
+import {
+  usePPMealsNaps,
+  MEAL_TYPE_LABEL,
+  PORTION_LABEL,
+} from "@/hooks/usePPMealsNaps";
+import {
+  usePPDiaperLogs,
+  DIAPER_TYPE_EMOJI,
+} from "@/hooks/usePPDiaperLogs";
 import {
   usePPBehaviorNotes,
   BEHAVIOR_TYPE_COLOR,
@@ -50,8 +57,12 @@ import { useChildHistory, type ChildAttendanceDay } from "@/hooks/useChildHistor
 import { useIsDesktop } from "@/hooks/useIsDesktop";
 
 // ─────────────────────────────────────────────────────────────
-// Helpers
+// Constants (vibe palette + helpers)
 // ─────────────────────────────────────────────────────────────
+
+const INK = "#1e3272";
+const INK2 = "#5070B0";
+const INK3 = "#99AACC";
 
 const MOOD_EMOJI: Record<MoodKey, string> = {
   happy: "😊",
@@ -69,13 +80,13 @@ const MOOD_LABEL: Record<MoodKey, string> = {
   unwell: "Unwell",
 };
 
-const STATUS_PILL: Record<string, { label: string; cls: string }> = {
-  present: { label: "Present", cls: "bg-edu-light-green text-edu-green border-edu-green/30" },
-  absent: { label: "Absent", cls: "bg-edu-light-red text-edu-red border-edu-red/30" },
-  late: { label: "Late", cls: "bg-edu-light-yellow text-edu-yellow border-edu-yellow/40" },
-  "half-day": { label: "Half day", cls: "bg-edu-light-blue text-edu-blue border-edu-blue/30" },
-  holiday: { label: "Holiday", cls: "bg-secondary text-muted-foreground border-border" },
-  none: { label: "Not marked", cls: "bg-secondary text-muted-foreground border-border" },
+const STATUS_PILL: Record<string, { label: string; bg: string; fg: string }> = {
+  present: { label: "Present", bg: "rgba(16,185,129,0.14)", fg: "#047857" },
+  absent: { label: "Absent", bg: "rgba(239,68,68,0.14)", fg: "#B91C1C" },
+  late: { label: "Late", bg: "rgba(245,158,11,0.16)", fg: "#92400E" },
+  "half-day": { label: "Half day", bg: "rgba(0,85,255,0.12)", fg: "#1e40af" },
+  holiday: { label: "Holiday", bg: "rgba(123,63,244,0.12)", fg: "#5b21b6" },
+  none: { label: "Not marked", bg: "rgba(153,170,204,0.18)", fg: "#5070B0" },
 };
 
 const LEVEL_SCORE: Record<RubricLevel, number> = {
@@ -85,8 +96,6 @@ const LEVEL_SCORE: Record<RubricLevel, number> = {
   excelling: 4,
 };
 
-// Returns "+91XXXXXXXXXX" or "" — same shape as ParentDirectory's normaliser
-// but inlined here to keep dependencies minimal.
 const cleanPhone = (raw?: string): string => {
   if (!raw) return "";
   const digits = raw.replace(/\D/g, "");
@@ -164,443 +173,723 @@ export default function ChildProfile360() {
   );
 
   const todayAttendance = childId ? attendanceToday[childId] : undefined;
+  const attendancePct = useMemo(() => {
+    const marked = history.attendance.filter((d) => d.status !== "none");
+    if (marked.length === 0) return null;
+    const present = marked.filter(
+      (d) => d.status === "present" || d.status === "late"
+    ).length;
+    return Math.round((present / marked.length) * 100);
+  }, [history.attendance]);
 
   // ─── Empty / loading states ──────────────────────────────
   if (classLoading || rosterLoading) {
     return (
-      <div className="px-4 py-12 flex flex-col items-center text-muted-foreground gap-3">
-        <Loader2 className="w-6 h-6 animate-spin" />
-        <p className="text-xs">Loading profile…</p>
-      </div>
+      <ScaffoldFrame>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            minHeight: "60vh",
+            gap: 10,
+          }}
+        >
+          <Loader2 className="animate-spin" size={20} color={INK} />
+          <span style={{ fontSize: 13, color: INK3 }}>
+            Loading child profile…
+          </span>
+        </div>
+      </ScaffoldFrame>
     );
   }
 
   if (!primaryClass) {
     return (
-      <div className="px-4 py-12 text-center">
-        <p className="text-sm font-bold text-edu-navy">No class assigned</p>
-        <p className="text-xs text-muted-foreground mt-1">
-          Contact your principal to be added to a class.
-        </p>
-      </div>
+      <ScaffoldFrame>
+        <div style={{ padding: 64, textAlign: "center" }}>
+          <p style={{ fontSize: 16, fontWeight: 600, color: INK }}>
+            No class assigned
+          </p>
+          <p style={{ fontSize: 12, color: INK3, marginTop: 4 }}>
+            Contact your principal to be added to a class.
+          </p>
+        </div>
+      </ScaffoldFrame>
     );
   }
 
   if (!child) {
     return (
-      <div className="px-4 py-12 text-center space-y-3">
-        <p className="text-sm font-bold text-edu-navy">Child not found in your class</p>
-        <p className="text-xs text-muted-foreground">
-          This child may belong to a different class or has been archived.
-        </p>
-        <Button variant="outline" size="sm" onClick={() => navigate("/roster")}>
-          <ArrowLeft className="w-3.5 h-3.5" />
-          Back to roster
-        </Button>
-      </div>
+      <ScaffoldFrame>
+        <div style={{ padding: 64, textAlign: "center" }}>
+          <p style={{ fontSize: 16, fontWeight: 600, color: INK }}>
+            Child not found in your class
+          </p>
+          <p style={{ fontSize: 12, color: INK3, marginTop: 6 }}>
+            They may belong to a different class or have been archived.
+          </p>
+          <button
+            type="button"
+            onClick={() => navigate("/roster")}
+            style={{
+              marginTop: 14,
+              padding: "8px 20px",
+              borderRadius: 10,
+              border: "1px solid rgba(30,50,114,0.10)",
+              background: "#fff",
+              color: INK,
+              fontSize: 13,
+              fontWeight: 600,
+              cursor: "pointer",
+            }}
+          >
+            ← Back to roster
+          </button>
+        </div>
+      </ScaffoldFrame>
     );
   }
 
-  // ─── Sub-renderers (used in both layouts) ───────────────
+  const ageStr =
+    child.ageMonths != null
+      ? `${Math.floor(child.ageMonths / 12)}y ${child.ageMonths % 12}m`
+      : null;
 
-  const IdentityCard = (
-    <Card className="overflow-hidden">
-      <CardContent className="p-4 flex items-center gap-4">
+  // ─── Reusable sub-renderers ──────────────────────────────
+
+  const IdentityPanel = (
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        paddingTop: isDesktop ? 16 : 4,
+      }}
+    >
+      <div
+        style={{
+          width: isDesktop ? 140 : 112,
+          height: isDesktop ? 140 : 112,
+          borderRadius: "50%",
+          border: `${isDesktop ? 4 : 3}px solid ${INK}`,
+          background: "rgba(0,85,255,0.08)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          marginBottom: 14,
+          boxShadow: "0 10px 30px rgba(30,50,114,0.18)",
+          overflow: "hidden",
+        }}
+      >
         {child.photoURL ? (
           <img
             src={child.photoURL}
             alt={child.name}
-            className="w-20 h-20 rounded-full object-cover border-2 border-edu-navy/10 shrink-0"
+            style={{ width: "100%", height: "100%", objectFit: "cover" }}
           />
         ) : (
-          <div className="w-20 h-20 rounded-full bg-edu-navy text-white flex items-center justify-center text-2xl font-black shrink-0">
+          <span
+            style={{
+              fontSize: isDesktop ? 42 : 34,
+              fontWeight: 800,
+              color: INK,
+            }}
+          >
             {initials(child.name)}
-          </div>
+          </span>
         )}
-        <div className="min-w-0 flex-1">
-          <h1 className="text-lg lg:text-xl font-black text-edu-navy truncate">
-            {child.name}
-          </h1>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            Roll {child.rollNo}
-            {child.ageMonths != null
-              ? ` · ${Math.floor(child.ageMonths / 12)}y ${child.ageMonths % 12}m`
-              : ""}
-            {child.diet ? ` · ${child.diet}` : ""}
-          </p>
-          <div className="mt-2 flex items-center gap-1.5 flex-wrap">
-            <StatusPill status={todayAttendance?.status || "none"} />
-            {todayAttendance?.mood && <MoodPill mood={todayAttendance.mood} />}
-            {todayAttendance?.arrivalTime && (
-              <span className="text-[10px] text-muted-foreground">
-                Arrived{" "}
-                {new Date(todayAttendance.arrivalTime).toLocaleTimeString(
-                  "en-IN",
-                  { hour: "2-digit", minute: "2-digit" }
-                )}
-              </span>
+      </div>
+      <h2
+        style={{
+          fontSize: isDesktop ? 22 : 19,
+          fontWeight: 800,
+          color: INK,
+          textAlign: "center",
+          margin: 0,
+        }}
+      >
+        {child.name}
+      </h2>
+      <p style={{ fontSize: 12, color: INK2, marginTop: 4 }}>
+        {primaryClass.name}
+        {ageStr ? ` · ${ageStr}` : ""}
+      </p>
+      <p style={{ fontSize: 11, color: INK3, marginTop: 2 }}>
+        Roll {child.rollNo}
+        {child.diet ? ` · ${child.diet}` : ""}
+      </p>
+      <div style={{ display: "flex", gap: 6, marginTop: 10, flexWrap: "wrap", justifyContent: "center" }}>
+        <StatusPill status={todayAttendance?.status || "none"} />
+        {todayAttendance?.mood && <MoodPill mood={todayAttendance.mood} />}
+        {todayAttendance?.arrivalTime && (
+          <span style={{ fontSize: 10, color: INK3, alignSelf: "center" }}>
+            Arrived{" "}
+            {new Date(todayAttendance.arrivalTime).toLocaleTimeString(
+              "en-IN",
+              { hour: "2-digit", minute: "2-digit" }
             )}
-          </div>
-        </div>
-      </CardContent>
-    </Card>
+          </span>
+        )}
+      </div>
+    </div>
   );
 
-  const SafetyCard = ((child.allergies && child.allergies.length > 0) ||
-    child.medical ||
-    child.bloodGroup) && (
-    <Card className="bg-edu-light-red/30 border-edu-red/30">
-      <CardContent className="p-3 space-y-1.5">
-        <div className="flex items-center gap-2 mb-1">
-          <ShieldAlert className="w-4 h-4 text-edu-red" />
-          <p className="text-[10px] font-black uppercase tracking-widest text-edu-red">
-            Safety alerts
-          </p>
-        </div>
+  const hasSafety =
+    (child.allergies && child.allergies.length > 0) ||
+    !!child.medical ||
+    !!child.bloodGroup;
+
+  const SafetyCard = hasSafety && (
+    <ThemedCard
+      title="Safety alerts"
+      theme="orange"
+      icon={ShieldAlert}
+      watermark={ShieldAlert}
+    >
+      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
         {child.allergies && child.allergies.length > 0 && (
-          <p className="text-xs">
-            <span className="font-bold">Allergies:</span>{" "}
+          <p style={{ fontSize: 12, color: INK, margin: 0 }}>
+            <span style={{ fontWeight: 700 }}>Allergies:</span>{" "}
             {child.allergies.join(", ")}
           </p>
         )}
         {child.medical && (
-          <p className="text-xs">
-            <span className="font-bold">Medical:</span> {child.medical}
+          <p style={{ fontSize: 12, color: INK, margin: 0 }}>
+            <span style={{ fontWeight: 700 }}>Medical:</span> {child.medical}
           </p>
         )}
         {child.bloodGroup && (
-          <p className="text-xs">
-            <span className="font-bold">Blood group:</span> {child.bloodGroup}
+          <p style={{ fontSize: 12, color: INK, margin: 0 }}>
+            <span style={{ fontWeight: 700 }}>Blood group:</span>{" "}
+            {child.bloodGroup}
           </p>
         )}
-      </CardContent>
-    </Card>
-  );
-
-  const TodaySnapshot = (
-    <Section title="Today" icon={<Activity className="w-3.5 h-3.5" />}>
-      <div className="grid grid-cols-2 gap-2">
-        <TodayTile
-          icon={<Utensils className="w-4 h-4" />}
-          label="Meals"
-          count={todayMeals.length}
-          sub={
-            todayMeals.length > 0
-              ? `Last: ${MEAL_TYPE_LABEL[todayMeals[todayMeals.length - 1].mealType]} (${PORTION_LABEL[todayMeals[todayMeals.length - 1].portion]})`
-              : "No meals logged"
-          }
-          accent="bg-edu-light-orange text-edu-orange"
-        />
-        <TodayTile
-          icon={<Moon className="w-4 h-4" />}
-          label="Nap"
-          count={todayNaps.length}
-          sub={
-            todayNaps.length > 0
-              ? (() => {
-                  const n = todayNaps[todayNaps.length - 1];
-                  return n.endTime
-                    ? `${n.durationMin ?? "-"} min`
-                    : `Ongoing · ${n.startTime}`;
-                })()
-              : "No nap yet"
-          }
-          accent="bg-edu-light-blue text-edu-blue"
-        />
-        <TodayTile
-          icon={<Droplet className="w-4 h-4" />}
-          label="Care"
-          count={todayDiaper.length}
-          sub={
-            todayDiaper.length > 0
-              ? `Last: ${DIAPER_TYPE_EMOJI[todayDiaper[todayDiaper.length - 1].type]} ${todayDiaper[todayDiaper.length - 1].time}`
-              : "Nothing logged"
-          }
-          accent="bg-edu-light-green text-edu-green"
-        />
-        <TodayTile
-          icon={<Camera className="w-4 h-4" />}
-          label="Photos"
-          count={childPhotosToday.length}
-          sub={
-            childPhotosToday.length > 0
-              ? `${childPhotosToday.length} today`
-              : "None yet"
-          }
-          accent="bg-edu-pink/20 text-edu-pink"
-        />
       </div>
-    </Section>
+    </ThemedCard>
   );
 
-  const AttendanceStrip = (
-    <Section
-      title="Attendance · last 14 days"
-      icon={<CalendarDays className="w-3.5 h-3.5" />}
+  const ParentCard = (
+    <ThemedCard title="Parent contact" theme="navy" icon={Phone} watermark={Phone}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+        <div>
+          <p style={{ fontSize: 13, fontWeight: 700, color: INK, margin: 0 }}>
+            {child.parentName || "Parent"}
+          </p>
+          <p
+            style={{
+              fontSize: 11,
+              color: INK3,
+              margin: 0,
+              wordBreak: "break-all",
+            }}
+          >
+            {child.parentEmail || child.email || "—"}
+          </p>
+          {child.parentPhone && (
+            <p style={{ fontSize: 11, color: INK3, margin: 0 }}>
+              {child.parentPhone}
+            </p>
+          )}
+        </div>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 4 }}>
+          {child.parentPhone && (
+            <>
+              <ActionChip
+                href={`tel:${cleanPhone(child.parentPhone).replace("+", "")}`}
+                icon={<Phone size={12} />}
+                label="Call"
+                color="#0055FF"
+              />
+              <ActionChip
+                href={`https://wa.me/${cleanPhone(child.parentPhone).replace(
+                  "+",
+                  ""
+                )}`}
+                external
+                icon={<MessageCircle size={12} />}
+                label="WhatsApp"
+                color="#10B981"
+              />
+            </>
+          )}
+          {(child.parentEmail || child.email) && (
+            <ActionChip
+              href={`mailto:${child.parentEmail || child.email}`}
+              icon={<Mail size={12} />}
+              label="Email"
+              color="#1e3272"
+            />
+          )}
+        </div>
+      </div>
+    </ThemedCard>
+  );
+
+  const PickupCard =
+    child.authorizedPickup && child.authorizedPickup.length > 0 && (
+      <ThemedCard
+        title="Authorized pickup"
+        theme="blue"
+        icon={Users}
+        watermark={Users}
+      >
+        <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "flex", flexDirection: "column", gap: 8 }}>
+          {child.authorizedPickup.map((p) => (
+            <li
+              key={p.name}
+              style={{ display: "flex", alignItems: "center", gap: 8 }}
+            >
+              {p.photoURL ? (
+                <img
+                  src={p.photoURL}
+                  alt={p.name}
+                  style={{
+                    width: 32,
+                    height: 32,
+                    borderRadius: "50%",
+                    objectFit: "cover",
+                  }}
+                />
+              ) : (
+                <div
+                  style={{
+                    width: 32,
+                    height: 32,
+                    borderRadius: "50%",
+                    background: "rgba(30,50,114,0.10)",
+                    color: INK,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontSize: 11,
+                    fontWeight: 700,
+                  }}
+                >
+                  {initials(p.name)}
+                </div>
+              )}
+              <div style={{ minWidth: 0 }}>
+                <p style={{ fontSize: 12, fontWeight: 600, color: INK, margin: 0 }}>
+                  {p.name}
+                </p>
+                <p style={{ fontSize: 10, color: INK3, margin: 0 }}>
+                  {p.relation}
+                </p>
+              </div>
+            </li>
+          ))}
+        </ul>
+      </ThemedCard>
+    );
+
+  const ComfortCard = child.comfortCue && (
+    <ThemedCard
+      title="Comfort cue"
+      theme="pink"
+      icon={Heart}
+      watermark={Heart}
     >
-      <div className="flex gap-1.5 overflow-x-auto pb-1 -mx-1 px-1">
+      <p
+        style={{
+          fontSize: 13,
+          color: INK,
+          margin: 0,
+          fontStyle: "italic",
+          lineHeight: 1.5,
+        }}
+      >
+        “{child.comfortCue}”
+      </p>
+    </ThemedCard>
+  );
+
+  // ─── KPI strip (4 bright stat cards) ─────────────────────
+  const lastMeal = todayMeals[todayMeals.length - 1];
+  const lastNap = todayNaps[todayNaps.length - 1];
+  const lastDiaper = todayDiaper[todayDiaper.length - 1];
+
+  const KpiStrip = (
+    <div
+      style={{
+        display: "grid",
+        gridTemplateColumns: isDesktop ? "repeat(4, 1fr)" : "repeat(2, 1fr)",
+        gap: isDesktop ? 14 : 10,
+      }}
+    >
+      <KpiCard
+        theme="orange"
+        label="Meals"
+        value={todayMeals.length}
+        hint={
+          lastMeal
+            ? `Last: ${MEAL_TYPE_LABEL[lastMeal.mealType]} (${PORTION_LABEL[lastMeal.portion]})`
+            : "Nothing logged"
+        }
+        icon={Utensils}
+        watermark={Utensils}
+      />
+      <KpiCard
+        theme="blue"
+        label="Nap"
+        value={todayNaps.length}
+        hint={
+          lastNap
+            ? lastNap.endTime
+              ? `${lastNap.durationMin ?? "-"} min`
+              : `Ongoing · ${lastNap.startTime}`
+            : "Not yet"
+        }
+        icon={Moon}
+        watermark={Moon}
+      />
+      <KpiCard
+        theme="green"
+        label="Care"
+        value={todayDiaper.length}
+        hint={
+          lastDiaper
+            ? `${DIAPER_TYPE_EMOJI[lastDiaper.type]} ${lastDiaper.time}`
+            : "Nothing logged"
+        }
+        icon={Droplet}
+        watermark={Droplet}
+      />
+      <KpiCard
+        theme="pink"
+        label="Photos"
+        value={childPhotosToday.length}
+        hint={childPhotosToday.length > 0 ? "tagged today" : "None yet"}
+        icon={Camera}
+        watermark={Camera}
+      />
+    </div>
+  );
+
+  // ─── Section bodies ──────────────────────────────────────
+
+  const AttendanceBody = (
+    <>
+      <div
+        style={{
+          display: "flex",
+          gap: 6,
+          overflowX: "auto",
+          paddingBottom: 4,
+          marginBottom: 8,
+        }}
+      >
         {history.attendance.map((d) => (
           <AttendancePill key={d.date} day={d} />
         ))}
       </div>
-      <AttendanceSummary days={history.attendance} />
-    </Section>
+      <AttendanceSummary
+        days={history.attendance}
+        pct={attendancePct}
+      />
+    </>
   );
 
-  const GrowthSection = (
-    <Section title="Growth · NEP 2020 domains" icon={<Sprout className="w-3.5 h-3.5" />}>
-      <div className="space-y-2">
-        {ALL_DOMAINS.map((dom) => (
-          <DomainProgress key={dom} domain={dom} milestones={childMilestones} />
-        ))}
-      </div>
-    </Section>
+  const GrowthBody = (
+    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      {ALL_DOMAINS.map((dom) => (
+        <DomainProgress
+          key={dom}
+          domain={dom}
+          milestones={childMilestones}
+        />
+      ))}
+    </div>
   );
 
-  const NotesSection = childNotes.length > 0 && (
-    <Section title="Recent notes" icon={<Sticker className="w-3.5 h-3.5" />}>
-      <div className="space-y-2">
+  const NotesBody =
+    childNotes.length === 0 ? (
+      <EmptyHint
+        icon={<Sticker size={18} />}
+        text="No notes recorded for this child yet."
+      />
+    ) : (
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         {childNotes.slice(0, 5).map((n) => (
           <NoteCard key={n.id} note={n} />
         ))}
+        {childNotes.length > 5 && (
+          <Link
+            to="/behavior"
+            style={{
+              fontSize: 11,
+              color: "#0055FF",
+              fontWeight: 600,
+              textDecoration: "none",
+            }}
+          >
+            View all {childNotes.length} notes →
+          </Link>
+        )}
       </div>
-      {childNotes.length > 5 && (
-        <Link
-          to="/behavior"
-          className="text-[11px] text-edu-blue font-semibold inline-block mt-2"
-        >
-          View all {childNotes.length} notes →
-        </Link>
-      )}
-    </Section>
-  );
+    );
 
-  const MilestonesSection = childMilestones.length > 0 && (
-    <Section title="Recent milestones" icon={<Sprout className="w-3.5 h-3.5" />}>
-      <div className="space-y-2">
+  const MilestonesBody =
+    childMilestones.length === 0 ? (
+      <EmptyHint
+        icon={<Sprout size={18} />}
+        text="No milestone observations yet."
+      />
+    ) : (
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         {childMilestones.slice(0, 5).map((m) => (
           <MilestoneCard key={m.id} milestone={m} />
         ))}
-      </div>
-      {childMilestones.length > 5 && (
-        <Link
-          to="/milestones"
-          className="text-[11px] text-edu-blue font-semibold inline-block mt-2"
-        >
-          View all {childMilestones.length} milestones →
-        </Link>
-      )}
-    </Section>
-  );
-
-  const PhotosSection = childPhotosToday.length > 0 && (
-    <Section title="Today's photos" icon={<Camera className="w-3.5 h-3.5" />}>
-      <div className="grid grid-cols-3 gap-1.5">
-        {childPhotosToday.slice(0, 6).map((p) => (
-          <img
-            key={p.id}
-            src={p.storageUrl}
-            alt={p.caption || child.name}
-            className="aspect-square w-full object-cover rounded-lg border border-border"
-            loading="lazy"
-          />
-        ))}
-      </div>
-      <Link
-        to="/photos"
-        className="text-[11px] text-edu-blue font-semibold inline-block mt-2"
-      >
-        Open Photo Studio →
-      </Link>
-    </Section>
-  );
-
-  const ParentCard = (
-    <Section title="Parent" icon={<Phone className="w-3.5 h-3.5" />}>
-      <Card>
-        <CardContent className="p-3 space-y-2">
-          <div>
-            <p className="text-sm font-bold text-edu-navy">
-              {child.parentName || "Parent"}
-            </p>
-            <p className="text-[11px] text-muted-foreground break-all">
-              {child.parentEmail || child.email || "—"}
-            </p>
-            {child.parentPhone && (
-              <p className="text-[11px] text-muted-foreground">
-                {child.parentPhone}
-              </p>
-            )}
-          </div>
-          <div className="flex flex-wrap gap-1.5">
-            {child.parentPhone && (
-              <>
-                <a
-                  href={`tel:${cleanPhone(child.parentPhone).replace("+", "")}`}
-                  className="inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-full bg-edu-blue text-white"
-                >
-                  <Phone className="w-3 h-3" /> Call
-                </a>
-                <a
-                  href={`https://wa.me/${cleanPhone(child.parentPhone).replace("+", "")}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-full bg-edu-green text-white"
-                >
-                  <MessageCircle className="w-3 h-3" /> WhatsApp
-                </a>
-              </>
-            )}
-            {(child.parentEmail || child.email) && (
-              <a
-                href={`mailto:${child.parentEmail || child.email}`}
-                className="inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-full bg-edu-navy text-white"
-              >
-                <Mail className="w-3 h-3" /> Email
-              </a>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-    </Section>
-  );
-
-  const PickupCard = child.authorizedPickup && child.authorizedPickup.length > 0 && (
-    <Section title="Authorized pickup" icon={<Users className="w-3.5 h-3.5" />}>
-      <Card>
-        <CardContent className="p-3">
-          <ul className="space-y-2">
-            {child.authorizedPickup.map((p) => (
-              <li key={p.name} className="flex items-center gap-2">
-                {p.photoURL ? (
-                  <img
-                    src={p.photoURL}
-                    alt={p.name}
-                    className="w-8 h-8 rounded-full object-cover"
-                  />
-                ) : (
-                  <div className="w-8 h-8 rounded-full bg-edu-navy/10 text-edu-navy flex items-center justify-center text-[10px] font-bold">
-                    {initials(p.name)}
-                  </div>
-                )}
-                <div className="min-w-0">
-                  <p className="text-xs font-semibold truncate">{p.name}</p>
-                  <p className="text-[10px] text-muted-foreground">{p.relation}</p>
-                </div>
-              </li>
-            ))}
-          </ul>
-        </CardContent>
-      </Card>
-    </Section>
-  );
-
-  const ComfortCard = child.comfortCue && (
-    <Section title="Comfort cue" icon={<Heart className="w-3.5 h-3.5" />}>
-      <Card className="bg-edu-pink/10 border-edu-pink/30">
-        <CardContent className="p-3">
-          <p className="text-xs italic text-foreground/80 leading-relaxed">
-            "{child.comfortCue}"
-          </p>
-        </CardContent>
-      </Card>
-    </Section>
-  );
-
-  // ─── Layouts ──────────────────────────────────────────────
-
-  if (isDesktop) {
-    return (
-      <div className="px-8 py-6 animate-fade-in">
-        <BackBar onBack={() => navigate(-1)} className="mb-4" />
-        <div className="grid grid-cols-[340px_minmax(0,1fr)] gap-6 max-w-6xl">
-          {/* Sticky left rail */}
-          <aside className="space-y-3 self-start sticky top-4">
-            {IdentityCard}
-            {SafetyCard}
-            {ParentCard}
-            {PickupCard}
-            {ComfortCard}
-          </aside>
-
-          {/* Scrollable right column */}
-          <div className="space-y-4 min-w-0">
-            {TodaySnapshot}
-            {AttendanceStrip}
-            {GrowthSection}
-            <div className="grid grid-cols-2 gap-4">
-              <div>{NotesSection}</div>
-              <div>{MilestonesSection}</div>
-            </div>
-            {PhotosSection}
-          </div>
-        </div>
+        {childMilestones.length > 5 && (
+          <Link
+            to="/milestones"
+            style={{
+              fontSize: 11,
+              color: "#0055FF",
+              fontWeight: 600,
+              textDecoration: "none",
+            }}
+          >
+            View all {childMilestones.length} milestones →
+          </Link>
+        )}
       </div>
     );
-  }
 
-  // Mobile
+  const PhotosBody =
+    childPhotosToday.length === 0 ? (
+      <EmptyHint
+        icon={<Camera size={18} />}
+        text="No photos tagged with this child today."
+      />
+    ) : (
+      <>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: isDesktop ? "repeat(6, 1fr)" : "repeat(3, 1fr)",
+            gap: 8,
+          }}
+        >
+          {childPhotosToday.slice(0, isDesktop ? 12 : 6).map((p) => (
+            <img
+              key={p.id}
+              src={p.storageUrl}
+              alt={p.caption || child.name}
+              loading="lazy"
+              style={{
+                aspectRatio: "1 / 1",
+                width: "100%",
+                objectFit: "cover",
+                borderRadius: 10,
+                border: "0.5px solid rgba(30,50,114,0.10)",
+              }}
+            />
+          ))}
+        </div>
+        <Link
+          to="/photos"
+          style={{
+            fontSize: 11,
+            color: "#0055FF",
+            fontWeight: 600,
+            textDecoration: "none",
+            marginTop: 8,
+            display: "inline-block",
+          }}
+        >
+          Open Photo Studio →
+        </Link>
+      </>
+    );
+
+  // ─── Layout ──────────────────────────────────────────────
+
   return (
-    <div className="px-4 py-3 space-y-3 animate-fade-in">
-      <BackBar onBack={() => navigate(-1)} />
-      {IdentityCard}
-      {SafetyCard}
-      {TodaySnapshot}
-      {AttendanceStrip}
-      {GrowthSection}
-      {NotesSection}
-      {MilestonesSection}
-      {PhotosSection}
-      {ParentCard}
-      {PickupCard}
-      {ComfortCard}
-    </div>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────
-// Sub-components
-// ─────────────────────────────────────────────────────────────
-
-function BackBar({
-  onBack,
-  className,
-}: {
-  onBack: () => void;
-  className?: string;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onBack}
-      className={cn(
-        "inline-flex items-center gap-1.5 text-xs font-semibold text-muted-foreground hover:text-edu-navy transition",
-        className
-      )}
-    >
-      <ArrowLeft className="w-3.5 h-3.5" />
-      Back
-    </button>
-  );
-}
-
-function Section({
-  title,
-  icon,
-  children,
-}: {
-  title: string;
-  icon: React.ReactNode;
-  children: React.ReactNode;
-}) {
-  return (
-    <section>
-      <div className="flex items-center gap-1.5 mb-2 text-[10px] font-black uppercase tracking-widest text-muted-foreground">
-        {icon}
-        {title}
+    <ScaffoldFrame>
+      {/* Top bar */}
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginBottom: isDesktop ? 22 : 14,
+          gap: 8,
+        }}
+      >
+        <button
+          type="button"
+          onClick={() => navigate(-1)}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+            padding: isDesktop ? "8px 16px" : "7px 12px",
+            borderRadius: 10,
+            border: "1px solid rgba(30,50,114,0.12)",
+            background: "#fff",
+            color: INK2,
+            fontSize: isDesktop ? 13 : 11,
+            fontWeight: 600,
+            cursor: "pointer",
+          }}
+        >
+          <ArrowLeft size={isDesktop ? 14 : 13} />
+          {isDesktop ? "BACK TO ROSTER" : "BACK"}
+        </button>
       </div>
-      <div>{children}</div>
-    </section>
+
+      {/* Hero — 3-col on desktop (left stack | photo center | right stack), single column on mobile (photo first) */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: isDesktop ? "1fr 280px 1fr" : "1fr",
+          gap: isDesktop ? 20 : 14,
+          marginBottom: isDesktop ? 22 : 16,
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: isDesktop ? 14 : 12,
+            order: isDesktop ? 0 : 2,
+          }}
+        >
+          {SafetyCard}
+          {ComfortCard}
+          {!hasSafety && !child.comfortCue && (
+            <ThemedCard
+              title="Wellbeing"
+              theme="green"
+              icon={Heart}
+              watermark={Heart}
+            >
+              <p style={{ fontSize: 12, color: INK2, margin: 0 }}>
+                No safety alerts on file — ask the parent to add any allergies,
+                medical notes or a comfort cue from the Parent app.
+              </p>
+            </ThemedCard>
+          )}
+        </div>
+
+        <div style={{ order: isDesktop ? 0 : 1 }}>{IdentityPanel}</div>
+
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: isDesktop ? 14 : 12,
+            order: isDesktop ? 0 : 3,
+          }}
+        >
+          {ParentCard}
+          {PickupCard}
+        </div>
+      </div>
+
+      {/* KPI strip — 4 bright stat cards */}
+      <div style={{ marginBottom: isDesktop ? 22 : 16 }}>{KpiStrip}</div>
+
+      {/* Attendance + Growth (2-col) */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: isDesktop ? "1fr 1fr" : "1fr",
+          gap: isDesktop ? 20 : 14,
+          marginBottom: isDesktop ? 22 : 16,
+        }}
+      >
+        <ThemedCard
+          title="Attendance · last 14 days"
+          theme="navy"
+          icon={CalendarDays}
+          watermark={Activity}
+          action={
+            attendancePct !== null ? (
+              <span style={{ fontSize: 11, fontWeight: 700, color: INK }}>
+                {attendancePct}%
+              </span>
+            ) : null
+          }
+        >
+          {AttendanceBody}
+        </ThemedCard>
+        <ThemedCard
+          title="Growth · NEP 2020 domains"
+          theme="green"
+          icon={Sprout}
+          watermark={Sprout}
+          action={
+            <span style={{ fontSize: 11, fontWeight: 600, color: INK2 }}>
+              {childMilestones.length} obs.
+            </span>
+          }
+        >
+          {GrowthBody}
+        </ThemedCard>
+      </div>
+
+      {/* Notes + Milestones (2-col) */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: isDesktop ? "1fr 1fr" : "1fr",
+          gap: isDesktop ? 20 : 14,
+          marginBottom: isDesktop ? 22 : 16,
+        }}
+      >
+        <ThemedCard
+          title={`Recent notes · ${childNotes.length}`}
+          theme="pink"
+          icon={Sticker}
+          watermark={Sticker}
+        >
+          {NotesBody}
+        </ThemedCard>
+        <ThemedCard
+          title={`Recent milestones · ${childMilestones.length}`}
+          theme="green"
+          icon={GraduationCap}
+          watermark={Sprout}
+        >
+          {MilestonesBody}
+        </ThemedCard>
+      </div>
+
+      {/* Photos — full width */}
+      <div style={{ marginBottom: isDesktop ? 22 : 16 }}>
+        <ThemedCard
+          title={`Today's photos · ${childPhotosToday.length}`}
+          theme="blue"
+          icon={Camera}
+          watermark={Camera}
+        >
+          {PhotosBody}
+        </ThemedCard>
+      </div>
+    </ScaffoldFrame>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// Layout / atoms
+// ─────────────────────────────────────────────────────────────
+
+function ScaffoldFrame({ children }: { children: React.ReactNode }) {
+  return (
+    <div
+      style={{
+        minHeight: "100vh",
+        background: "#EEF4FF",
+        padding: "20px 24px 80px",
+        fontFamily:
+          "'Inter','Plus Jakarta Sans',-apple-system,sans-serif",
+      }}
+      className="max-w-[1280px] mx-auto"
+    >
+      {children}
+    </div>
   );
 }
 
@@ -608,10 +897,16 @@ function StatusPill({ status }: { status: string }) {
   const meta = STATUS_PILL[status] || STATUS_PILL.none;
   return (
     <span
-      className={cn(
-        "text-[10px] font-bold px-2 py-0.5 rounded-full border",
-        meta.cls
-      )}
+      style={{
+        fontSize: 10,
+        fontWeight: 700,
+        padding: "4px 10px",
+        borderRadius: 999,
+        background: meta.bg,
+        color: meta.fg,
+        letterSpacing: "0.04em",
+        textTransform: "uppercase",
+      }}
     >
       {meta.label}
     </span>
@@ -620,76 +915,100 @@ function StatusPill({ status }: { status: string }) {
 
 function MoodPill({ mood }: { mood: MoodKey }) {
   return (
-    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-secondary text-foreground border border-border inline-flex items-center gap-1">
-      <span className="text-sm leading-none">{MOOD_EMOJI[mood]}</span>
+    <span
+      style={{
+        fontSize: 10,
+        fontWeight: 600,
+        padding: "4px 10px",
+        borderRadius: 999,
+        background: "rgba(255,255,255,0.65)",
+        color: INK,
+        border: "0.5px solid rgba(30,50,114,0.12)",
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 4,
+      }}
+    >
+      <span style={{ fontSize: 13, lineHeight: 1 }}>{MOOD_EMOJI[mood]}</span>
       {MOOD_LABEL[mood]}
     </span>
   );
 }
 
-function TodayTile({
+function ActionChip({
+  href,
   icon,
   label,
-  count,
-  sub,
-  accent,
+  color,
+  external,
 }: {
+  href: string;
   icon: React.ReactNode;
   label: string;
-  count: number;
-  sub: string;
-  accent: string;
+  color: string;
+  external?: boolean;
 }) {
   return (
-    <Card>
-      <CardContent className="p-3">
-        <div className="flex items-center justify-between">
-          <span
-            className={cn(
-              "w-7 h-7 rounded-full flex items-center justify-center",
-              accent
-            )}
-          >
-            {icon}
-          </span>
-          <span className="text-xl font-black text-edu-navy">{count}</span>
-        </div>
-        <p className="text-[11px] font-bold text-edu-navy mt-1.5">{label}</p>
-        <p className="text-[10px] text-muted-foreground truncate">{sub}</p>
-      </CardContent>
-    </Card>
+    <a
+      href={href}
+      target={external ? "_blank" : undefined}
+      rel={external ? "noreferrer" : undefined}
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 4,
+        padding: "5px 10px",
+        borderRadius: 999,
+        background: color,
+        color: "#fff",
+        fontSize: 11,
+        fontWeight: 700,
+        textDecoration: "none",
+      }}
+    >
+      {icon}
+      {label}
+    </a>
   );
 }
 
 function AttendancePill({ day }: { day: ChildAttendanceDay }) {
   const { dd, ddd } = shortDate(day.date);
-  const cls =
-    day.status === "present"
-      ? "bg-edu-light-green text-edu-green border-edu-green/30"
-      : day.status === "absent"
-      ? "bg-edu-light-red text-edu-red border-edu-red/30"
-      : day.status === "late"
-      ? "bg-edu-light-yellow text-edu-yellow border-edu-yellow/40"
-      : day.status === "half-day"
-      ? "bg-edu-light-blue text-edu-blue border-edu-blue/30"
-      : day.status === "holiday"
-      ? "bg-secondary text-muted-foreground border-border"
-      : "bg-white text-muted-foreground/60 border-dashed border-border";
+  const meta = STATUS_PILL[day.status] || STATUS_PILL.none;
+  const isMarked = day.status !== "none";
   return (
     <div
-      className={cn(
-        "flex flex-col items-center justify-center min-w-[36px] h-12 rounded-lg border text-[10px] shrink-0",
-        cls
-      )}
-      title={`${day.date} · ${STATUS_PILL[day.status]?.label || day.status}`}
+      title={`${day.date} · ${meta.label}`}
+      style={{
+        flexShrink: 0,
+        minWidth: 36,
+        height: 50,
+        borderRadius: 10,
+        border: isMarked
+          ? `0.5px solid ${meta.fg}33`
+          : "1px dashed rgba(153,170,204,0.45)",
+        background: isMarked ? meta.bg : "rgba(255,255,255,0.6)",
+        color: isMarked ? meta.fg : INK3,
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        fontSize: 10,
+      }}
     >
-      <span className="font-black">{dd}</span>
-      <span className="opacity-60">{ddd}</span>
+      <span style={{ fontWeight: 800 }}>{dd}</span>
+      <span style={{ opacity: 0.7 }}>{ddd}</span>
     </div>
   );
 }
 
-function AttendanceSummary({ days }: { days: ChildAttendanceDay[] }) {
+function AttendanceSummary({
+  days,
+  pct,
+}: {
+  days: ChildAttendanceDay[];
+  pct: number | null;
+}) {
   const counts = days.reduce(
     (acc, d) => {
       if (d.status === "present") acc.present += 1;
@@ -699,21 +1018,28 @@ function AttendanceSummary({ days }: { days: ChildAttendanceDay[] }) {
     },
     { present: 0, absent: 0, late: 0 }
   );
-  const marked = counts.present + counts.absent + counts.late;
-  if (marked === 0) {
+  if (pct === null) {
     return (
-      <p className="text-[10px] text-muted-foreground mt-2">
+      <p style={{ fontSize: 11, color: INK3, margin: 0 }}>
         No attendance recorded in the last 14 days.
       </p>
     );
   }
-  const pct = Math.round((counts.present / marked) * 100);
   return (
-    <p className="text-[10px] text-muted-foreground mt-2">
-      <span className="text-edu-green font-bold">{counts.present}P</span> ·{" "}
-      <span className="text-edu-red font-bold">{counts.absent}A</span> ·{" "}
-      <span className="text-edu-yellow font-bold">{counts.late}L</span> ·{" "}
-      <span className="font-bold text-edu-navy">{pct}%</span> attendance
+    <p style={{ fontSize: 11, color: INK2, margin: 0 }}>
+      <span style={{ color: "#047857", fontWeight: 700 }}>
+        {counts.present}P
+      </span>{" "}
+      ·{" "}
+      <span style={{ color: "#B91C1C", fontWeight: 700 }}>
+        {counts.absent}A
+      </span>{" "}
+      ·{" "}
+      <span style={{ color: "#92400E", fontWeight: 700 }}>
+        {counts.late}L
+      </span>{" "}
+      ·{" "}
+      <span style={{ color: INK, fontWeight: 800 }}>{pct}%</span> attendance
     </p>
   );
 }
@@ -732,22 +1058,30 @@ function DomainProgress({
   }, null);
   const reachedIdx = highest ? LEVEL_SCORE[highest] : 0;
   return (
-    <div className="flex items-center gap-2">
+    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
       <span
         className={cn(
-          "w-7 h-7 rounded-full flex items-center justify-center text-sm shrink-0 border",
+          "shrink-0 rounded-full flex items-center justify-center border",
           DOMAIN_COLOR[domain]
         )}
+        style={{ width: 32, height: 32, fontSize: 14 }}
       >
         {DOMAIN_EMOJI[domain]}
       </span>
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center justify-between mb-1">
-          <p className="text-[11px] font-bold text-edu-navy">
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            marginBottom: 4,
+          }}
+        >
+          <p style={{ fontSize: 11, fontWeight: 700, color: INK, margin: 0 }}>
             {DOMAIN_LABEL[domain]}
           </p>
-          <p className="text-[10px] text-muted-foreground">
-            {domainMs.length} observation{domainMs.length === 1 ? "" : "s"}
+          <p style={{ fontSize: 10, color: INK3, margin: 0 }}>
+            {domainMs.length} obs.
             {highest && (
               <>
                 {" · "}
@@ -758,16 +1092,18 @@ function DomainProgress({
             )}
           </p>
         </div>
-        <div className="flex gap-1">
+        <div style={{ display: "flex", gap: 4 }}>
           {ALL_LEVELS.map((lvl, i) => {
             const filled = i < reachedIdx;
             return (
               <div
                 key={lvl}
-                className={cn(
-                  "h-1.5 flex-1 rounded-full transition-colors",
-                  filled ? "bg-edu-navy" : "bg-border"
-                )}
+                style={{
+                  height: 6,
+                  flex: 1,
+                  borderRadius: 999,
+                  background: filled ? INK : "rgba(30,50,114,0.12)",
+                }}
               />
             );
           })}
@@ -779,73 +1115,136 @@ function DomainProgress({
 
 function NoteCard({ note }: { note: BehaviorNote }) {
   return (
-    <Card>
-      <CardContent className="p-3">
-        <div className="flex items-center justify-between mb-1.5">
-          <span
-            className={cn(
-              "text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full border",
-              BEHAVIOR_TYPE_COLOR[note.type]
-            )}
-          >
-            {BEHAVIOR_TYPE_LABEL[note.type]}
-          </span>
-          <span className="text-[10px] text-muted-foreground">
-            {new Date(note.createdAt).toLocaleDateString("en-IN", {
-              day: "numeric",
-              month: "short",
-            })}
-          </span>
-        </div>
-        <p className="text-xs text-foreground/90 leading-relaxed">
-          {note.content}
-        </p>
-        <p className="text-[10px] text-muted-foreground mt-1.5">
-          — {note.createdByName}
-        </p>
-      </CardContent>
-    </Card>
+    <div
+      style={{
+        background: "rgba(255,255,255,0.7)",
+        border: "0.5px solid rgba(30,50,114,0.08)",
+        borderRadius: 12,
+        padding: 12,
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          marginBottom: 6,
+        }}
+      >
+        <span
+          className={cn(
+            "text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full border",
+            BEHAVIOR_TYPE_COLOR[note.type]
+          )}
+        >
+          {BEHAVIOR_TYPE_LABEL[note.type]}
+        </span>
+        <span style={{ fontSize: 10, color: INK3 }}>
+          {new Date(note.createdAt).toLocaleDateString("en-IN", {
+            day: "numeric",
+            month: "short",
+          })}
+        </span>
+      </div>
+      <p
+        style={{
+          fontSize: 12,
+          color: INK,
+          lineHeight: 1.5,
+          margin: 0,
+        }}
+      >
+        {note.content}
+      </p>
+      <p style={{ fontSize: 10, color: INK3, marginTop: 6, margin: "6px 0 0" }}>
+        — {note.createdByName}
+      </p>
+    </div>
   );
 }
 
 function MilestoneCard({ milestone }: { milestone: Milestone }) {
   return (
-    <Card>
-      <CardContent className="p-3">
-        <div className="flex items-center justify-between mb-1.5">
-          <span
-            className={cn(
-              "text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full border inline-flex items-center gap-1",
-              DOMAIN_COLOR[milestone.domain]
-            )}
-          >
-            {DOMAIN_EMOJI[milestone.domain]} {DOMAIN_LABEL[milestone.domain]}
-          </span>
-          <span
-            className={cn(
-              "text-[10px] font-bold",
-              LEVEL_COLOR[milestone.level]
-            )}
-          >
-            {LEVEL_LABEL[milestone.level]}
-          </span>
-        </div>
-        <p className="text-xs text-foreground/90 leading-relaxed">
-          {milestone.observation}
+    <div
+      style={{
+        background: "rgba(255,255,255,0.7)",
+        border: "0.5px solid rgba(30,50,114,0.08)",
+        borderRadius: 12,
+        padding: 12,
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          marginBottom: 6,
+        }}
+      >
+        <span
+          className={cn(
+            "text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full border inline-flex items-center gap-1",
+            DOMAIN_COLOR[milestone.domain]
+          )}
+        >
+          {DOMAIN_EMOJI[milestone.domain]} {DOMAIN_LABEL[milestone.domain]}
+        </span>
+        <span
+          className={cn(
+            "text-[10px] font-bold",
+            LEVEL_COLOR[milestone.level]
+          )}
+        >
+          {LEVEL_LABEL[milestone.level]}
+        </span>
+      </div>
+      <p style={{ fontSize: 12, color: INK, lineHeight: 1.5, margin: 0 }}>
+        {milestone.observation}
+      </p>
+      {milestone.evidence && (
+        <p
+          style={{
+            fontSize: 10,
+            color: INK3,
+            margin: "4px 0 0",
+            fontStyle: "italic",
+          }}
+        >
+          Evidence: {milestone.evidence}
         </p>
-        {milestone.evidence && (
-          <p className="text-[10px] text-muted-foreground mt-1 italic">
-            Evidence: {milestone.evidence}
-          </p>
-        )}
-        <p className="text-[10px] text-muted-foreground mt-1.5">
-          {new Date(milestone.recordedAt).toLocaleDateString("en-IN", {
-            day: "numeric",
-            month: "short",
-          })}
-          {milestone.term ? ` · ${milestone.term}` : ""}
-        </p>
-      </CardContent>
-    </Card>
+      )}
+      <p style={{ fontSize: 10, color: INK3, margin: "6px 0 0" }}>
+        {new Date(milestone.recordedAt).toLocaleDateString("en-IN", {
+          day: "numeric",
+          month: "short",
+        })}
+        {milestone.term ? ` · ${milestone.term}` : ""}
+      </p>
+    </div>
+  );
+}
+
+function EmptyHint({
+  icon,
+  text,
+}: {
+  icon: React.ReactNode;
+  text: string;
+}) {
+  return (
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "20px 12px",
+        color: INK3,
+        gap: 6,
+      }}
+    >
+      {icon}
+      <p style={{ fontSize: 12, margin: 0, textAlign: "center" }}>{text}</p>
+    </div>
   );
 }
