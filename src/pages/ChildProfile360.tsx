@@ -20,6 +20,7 @@ import {
   GraduationCap,
 } from "lucide-react";
 import { ThemedCard, KpiCard } from "@/components/ThemedCard";
+import { CartoonAvatar } from "@/components/CartoonAvatar";
 import { cn } from "@/lib/utils";
 import { useTeacherClass } from "@/hooks/useTeacherClass";
 import { useClassRoster } from "@/hooks/useClassRoster";
@@ -269,36 +270,69 @@ export default function ChildProfile360() {
     >
       <div
         style={{
-          width: isDesktop ? 140 : 112,
-          height: isDesktop ? 140 : 112,
-          borderRadius: "50%",
-          border: `${isDesktop ? 4 : 3}px solid ${INK}`,
-          background: "rgba(0,85,255,0.08)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
+          position: "relative",
           marginBottom: 14,
-          boxShadow: "0 10px 30px rgba(30,50,114,0.18)",
-          overflow: "hidden",
         }}
       >
+        <div
+          style={{
+            position: "absolute",
+            inset: -10,
+            borderRadius: "50%",
+            background:
+              "radial-gradient(circle, rgba(255,224,236,0.7) 0%, rgba(225,236,255,0) 70%)",
+            zIndex: 0,
+          }}
+        />
         {child.photoURL ? (
-          <img
-            src={child.photoURL}
-            alt={child.name}
-            style={{ width: "100%", height: "100%", objectFit: "cover" }}
-          />
-        ) : (
-          <span
+          <div
             style={{
-              fontSize: isDesktop ? 42 : 34,
-              fontWeight: 800,
-              color: INK,
+              position: "relative",
+              width: isDesktop ? 140 : 112,
+              height: isDesktop ? 140 : 112,
+              borderRadius: "50%",
+              boxShadow:
+                "0 0 0 5px #FFE8F1, 0 0 0 8px #C9F5DE, 0 14px 30px rgba(30,50,114,0.18)",
+              overflow: "hidden",
             }}
           >
-            {initials(child.name)}
-          </span>
+            <img
+              src={child.photoURL}
+              alt={child.name}
+              style={{ width: "100%", height: "100%", objectFit: "cover" }}
+            />
+          </div>
+        ) : (
+          <CartoonAvatar
+            name={child.name}
+            size={isDesktop ? 140 : 112}
+            ringColor="#FFE8F1"
+            ringWidth={5}
+            style={{ position: "relative", zIndex: 1 }}
+          />
         )}
+        <div
+          style={{
+            position: "absolute",
+            top: -6,
+            right: -6,
+            width: 38,
+            height: 38,
+            borderRadius: "50%",
+            background: "linear-gradient(135deg, #FBBF24, #FCD34D)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: 20,
+            transform: "rotate(12deg)",
+            boxShadow: "0 6px 14px rgba(251,191,36,0.45)",
+            border: "2px solid #fff",
+            zIndex: 2,
+          }}
+          aria-hidden="true"
+        >
+          🌟
+        </div>
       </div>
       <h2
         style={{
@@ -343,6 +377,7 @@ export default function ChildProfile360() {
   const SafetyCard = hasSafety && (
     <ThemedCard
       title="Safety alerts"
+      emoji="🛟"
       theme="orange"
       icon={ShieldAlert}
       watermark={ShieldAlert}
@@ -370,7 +405,7 @@ export default function ChildProfile360() {
   );
 
   const ParentCard = (
-    <ThemedCard title="Parent contact" theme="navy" icon={Phone} watermark={Phone}>
+    <ThemedCard title="Parent contact" emoji="📞" theme="navy" icon={Phone} watermark={Phone}>
       <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
         <div>
           <p style={{ fontSize: 13, fontWeight: 700, color: INK, margin: 0 }}>
@@ -430,7 +465,8 @@ export default function ChildProfile360() {
     child.authorizedPickup && child.authorizedPickup.length > 0 && (
       <ThemedCard
         title="Authorized pickup"
-        theme="blue"
+        emoji="👨‍👩‍👧"
+        theme="lavender"
         icon={Users}
         watermark={Users}
       >
@@ -486,6 +522,7 @@ export default function ChildProfile360() {
   const ComfortCard = child.comfortCue && (
     <ThemedCard
       title="Comfort cue"
+      emoji="💗"
       theme="pink"
       icon={Heart}
       watermark={Heart}
@@ -518,8 +555,9 @@ export default function ChildProfile360() {
       }}
     >
       <KpiCard
-        theme="orange"
+        theme="butter"
         label="Meals"
+        emoji="🍪"
         value={todayMeals.length}
         hint={
           lastMeal
@@ -530,8 +568,9 @@ export default function ChildProfile360() {
         watermark={Utensils}
       />
       <KpiCard
-        theme="blue"
+        theme="lavender"
         label="Nap"
+        emoji="😴"
         value={todayNaps.length}
         hint={
           lastNap
@@ -546,6 +585,7 @@ export default function ChildProfile360() {
       <KpiCard
         theme="green"
         label="Care"
+        emoji="🍃"
         value={todayDiaper.length}
         hint={
           lastDiaper
@@ -558,6 +598,7 @@ export default function ChildProfile360() {
       <KpiCard
         theme="pink"
         label="Photos"
+        emoji="📸"
         value={childPhotosToday.length}
         hint={childPhotosToday.length > 0 ? "tagged today" : "None yet"}
         icon={Camera}
@@ -784,6 +825,7 @@ export default function ChildProfile360() {
           {!hasSafety && !child.comfortCue && (
             <ThemedCard
               title="Wellbeing"
+              emoji="🌿"
               theme="green"
               icon={Heart}
               watermark={Heart}
@@ -825,6 +867,7 @@ export default function ChildProfile360() {
       >
         <ThemedCard
           title="Attendance · last 14 days"
+          emoji="🌤️"
           theme="navy"
           icon={CalendarDays}
           watermark={Activity}
@@ -840,6 +883,7 @@ export default function ChildProfile360() {
         </ThemedCard>
         <ThemedCard
           title="Growth · NEP 2020 domains"
+          emoji="🌱"
           theme="green"
           icon={Sprout}
           watermark={Sprout}
@@ -864,6 +908,7 @@ export default function ChildProfile360() {
       >
         <ThemedCard
           title={`Recent notes · ${childNotes.length}`}
+          emoji="💌"
           theme="pink"
           icon={Sticker}
           watermark={Sticker}
@@ -872,6 +917,7 @@ export default function ChildProfile360() {
         </ThemedCard>
         <ThemedCard
           title={`Recent milestones · ${childMilestones.length}`}
+          emoji="🌟"
           theme="green"
           icon={GraduationCap}
           watermark={Sprout}
@@ -884,6 +930,7 @@ export default function ChildProfile360() {
       <div style={{ marginBottom: isDesktop ? 22 : 16 }}>
         <ThemedCard
           title={`Today's photos · ${childPhotosToday.length}`}
+          emoji="📸"
           theme="blue"
           icon={Camera}
           watermark={Camera}
@@ -921,14 +968,17 @@ function StatusPill({ status }: { status: string }) {
   return (
     <span
       style={{
-        fontSize: 10,
-        fontWeight: 700,
-        padding: "4px 10px",
+        fontSize: 11,
+        fontWeight: 800,
+        padding: "6px 14px",
         borderRadius: 999,
         background: meta.bg,
         color: meta.fg,
-        letterSpacing: "0.04em",
+        letterSpacing: "0.06em",
         textTransform: "uppercase",
+        boxShadow: `0 4px 10px ${meta.fg}22`,
+        transform: "rotate(-2deg)",
+        display: "inline-block",
       }}
     >
       {meta.label}
@@ -940,19 +990,21 @@ function MoodPill({ mood }: { mood: MoodKey }) {
   return (
     <span
       style={{
-        fontSize: 10,
-        fontWeight: 600,
-        padding: "4px 10px",
+        fontSize: 12,
+        fontWeight: 700,
+        padding: "6px 12px 6px 8px",
         borderRadius: 999,
-        background: "rgba(255,255,255,0.65)",
+        background: "#fff",
         color: INK,
-        border: "0.5px solid rgba(30,50,114,0.12)",
         display: "inline-flex",
         alignItems: "center",
-        gap: 4,
+        gap: 6,
+        boxShadow:
+          "0 0 0 3px #FFE8F1, 0 6px 14px rgba(244,114,182,0.20)",
+        transform: "rotate(2deg)",
       }}
     >
-      <span style={{ fontSize: 13, lineHeight: 1 }}>{MOOD_EMOJI[mood]}</span>
+      <span style={{ fontSize: 18, lineHeight: 1 }}>{MOOD_EMOJI[mood]}</span>
       {MOOD_LABEL[mood]}
     </span>
   );
