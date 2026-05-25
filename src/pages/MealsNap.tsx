@@ -1,7 +1,6 @@
 import { useMemo, useState } from "react";
 import {
   Loader2,
-  Sparkles,
   AlertTriangle,
   Moon,
   Utensils,
@@ -11,12 +10,10 @@ import {
 } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
-import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { cn } from "@/lib/utils";
 import { useTeacherClass } from "@/hooks/useTeacherClass";
 import { useClassRoster, type RosterChild } from "@/hooks/useClassRoster";
 import { useIsDesktop } from "@/hooks/useIsDesktop";
+import { CartoonAvatar } from "@/components/CartoonAvatar";
 import {
   usePPMealsNaps,
   type MealType,
@@ -29,17 +26,66 @@ import {
   PORTION_PERCENT,
 } from "@/hooks/usePPMealsNaps";
 
+/* ═══════════════════════════════════════════════════════════════════════
+   PRE-PRIMARY TEACHER · MEALS & NAP
+   Storybook-sherbet meals + naps tracker. CartoonAvatar in every row,
+   sherbet portion/meal-type tile pickers, pink open-nap pulse.
+   ════════════════════════════════════════════════════════════════════════ */
+
+const NAVY = "#1e3272";
+const MINT = "#10B981";
+const PEACH = "#FB923C";
+const BLUSH = "#EC4899";
+const SKY = "#0EA5E9";
+const LAV = "#A78BFA";
+const BUTTER = "#F59E0B";
+const RED = "#EF4444";
+
+const PILLOW =
+  "0 1px 0 rgba(255,255,255,0.55) inset, 0 14px 32px -10px rgba(30,50,114,0.16), 0 4px 10px rgba(30,50,114,0.06)";
+
 const MEAL_TYPES: MealType[] = ["breakfast", "snack", "lunch", "tea_snack"];
 const PORTIONS: Portion[] = ["none", "some", "most", "all"];
 
-const PORTION_COLOR: Record<Portion, string> = {
-  none: "bg-edu-light-red text-edu-red border-edu-red/30",
-  some: "bg-edu-light-yellow text-edu-yellow border-edu-yellow/40",
-  most: "bg-edu-light-blue text-edu-blue border-edu-blue/30",
-  all: "bg-edu-light-green text-edu-green border-edu-green/30",
+const PORTION_TONE: Record<Portion, { tone: string; surface: string }> = {
+  none: {
+    tone: RED,
+    surface: "linear-gradient(135deg, #FFD6D6 0%, #FFF1F1 100%)",
+  },
+  some: {
+    tone: BUTTER,
+    surface: "linear-gradient(135deg, #FFEBC8 0%, #FFF7E5 100%)",
+  },
+  most: {
+    tone: SKY,
+    surface: "linear-gradient(135deg, #DCEEFF 0%, #F5FAFF 100%)",
+  },
+  all: {
+    tone: MINT,
+    surface: "linear-gradient(135deg, #D6F5E2 0%, #F1FBF5 100%)",
+  },
 };
 
-function detectAllergens(meal: MealType, allergies: string[] = []): string[] {
+const MEAL_TONE: Record<MealType, { tone: string; surface: string }> = {
+  breakfast: {
+    tone: PEACH,
+    surface: "linear-gradient(135deg, #FFE0CC 0%, #FFF5EC 100%)",
+  },
+  snack: {
+    tone: MINT,
+    surface: "linear-gradient(135deg, #D6F5E2 0%, #F1FBF5 100%)",
+  },
+  lunch: {
+    tone: BUTTER,
+    surface: "linear-gradient(135deg, #FFEBC8 0%, #FFF7E5 100%)",
+  },
+  tea_snack: {
+    tone: BLUSH,
+    surface: "linear-gradient(135deg, #FFE0EC 0%, #FFF4F8 100%)",
+  },
+};
+
+function detectAllergens(_meal: MealType, allergies: string[] = []): string[] {
   if (!allergies.length) return [];
   return allergies.filter((a) => a && a.trim().length > 0);
 }
@@ -79,14 +125,15 @@ export default function MealsNap() {
         .filter((m) => m.studentId === c.id)
         .slice()
         .sort((a, b) => (a.recordedAt < b.recordedAt ? -1 : 1));
-      const openNap = naps.find((n) => n.studentId === c.id && !n.endTime) || null;
-      const recentNap = openNap ||
+      const openNap =
+        naps.find((n) => n.studentId === c.id && !n.endTime) || null;
+      const recentNap =
+        openNap ||
         naps
           .filter((n) => n.studentId === c.id)
           .slice()
-          .sort((a, b) =>
-            a.recordedAt < b.recordedAt ? 1 : -1
-          )[0] || null;
+          .sort((a, b) => (a.recordedAt < b.recordedAt ? 1 : -1))[0] ||
+        null;
       return {
         child: c,
         meals: childMeals,
@@ -102,38 +149,24 @@ export default function MealsNap() {
     return summaries.filter((s) => s.child.name.toLowerCase().includes(q));
   }, [summaries, search]);
 
-  if (classLoading) {
-    return (
-      <div className="px-4 py-12 flex flex-col items-center gap-3 text-muted-foreground">
-        <Loader2 className="w-6 h-6 animate-spin" />
-        <p className="text-xs">Resolving your class…</p>
-      </div>
-    );
-  }
-
+  if (classLoading) return <CenteredLoader label="Resolving your class…" />;
   if (!primaryClass) {
     return (
-      <div className="px-4 py-12 text-center">
-        <p className="text-sm font-bold text-edu-navy">No class assigned</p>
+      <div style={{ padding: "48px 16px", textAlign: "center" }}>
+        <p style={{ fontSize: 16, fontWeight: 800, color: NAVY }}>
+          🌱 No class assigned
+        </p>
       </div>
     );
   }
-
-  if (allLoading && roster.length === 0) {
-    return (
-      <div className="px-4 py-12 flex flex-col items-center gap-3 text-muted-foreground">
-        <Loader2 className="w-6 h-6 animate-spin" />
-        <p className="text-xs">Loading…</p>
-      </div>
-    );
-  }
+  if (allLoading && roster.length === 0)
+    return <CenteredLoader label="Loading meals & naps…" />;
 
   const stats = {
     mealsLogged: data?.meals.length || 0,
     napsLogged: data?.naps.length || 0,
     refused: (data?.meals || []).filter((m) => m.portion === "none").length,
-    napping:
-      (data?.naps || []).filter((n) => !n.endTime).length,
+    napping: (data?.naps || []).filter((n) => !n.endTime).length,
   };
 
   const openMeal = (child: RosterChild) => {
@@ -142,7 +175,11 @@ export default function MealsNap() {
     setNote("");
     setSheet({ mode: "meal", child });
   };
-  const handleNapToggle = async (child: RosterChild, existing: NapEntry | null) => {
+
+  const handleNapToggle = async (
+    child: RosterChild,
+    existing: NapEntry | null
+  ) => {
     if (existing && !existing.endTime) {
       setBusy(true);
       try {
@@ -203,77 +240,169 @@ export default function MealsNap() {
     }
   };
 
-  const header = (
-    <div className="flex items-baseline justify-between pt-1">
-      <div>
-        <p className="text-xs text-muted-foreground font-semibold">
-          {format(new Date(), "EEEE, d MMM")} · {primaryClass.name}
-        </p>
-        <h1
-          className={cn(
-            "font-black text-edu-navy mt-0.5",
-            isDesktop ? "text-2xl" : "text-xl"
-          )}
-        >
-          Meals &amp; Nap 🍱
-        </h1>
-      </div>
-    </div>
-  );
-
-  const statsBanner = (
-    <div className="rounded-2xl bg-gradient-to-br from-edu-blue to-edu-navy text-white p-4 shadow-md">
-      <div className="flex items-center gap-2 text-[10px] uppercase tracking-widest text-white/70 font-bold">
-        <Sparkles className="w-3 h-3" />
-        Today
-      </div>
-      <div className="grid grid-cols-4 gap-3 mt-2">
-        <Stat label="Meals" value={stats.mealsLogged} />
-        <Stat label="Refused" value={stats.refused} warn={stats.refused > 0} />
-        <Stat label="Naps" value={stats.napsLogged} />
-        <Stat label="Napping" value={stats.napping} live={stats.napping > 0} />
-      </div>
-    </div>
-  );
-
-  const searchBar = (
-    <div className="relative">
-      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-      <Input
-        placeholder="Search a child…"
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        className="pl-9"
-      />
-    </div>
-  );
+  const cardCols = isDesktop ? "repeat(3, minmax(0, 1fr))" : "1fr";
 
   return (
     <div
-      className={cn(
-        "py-4 space-y-4 animate-fade-in",
-        isDesktop ? "px-6 lg:px-10 max-w-7xl mx-auto" : "px-4"
-      )}
+      className="animate-fade-in"
+      style={{
+        padding: isDesktop ? "24px 28px 80px" : "16px 16px 80px",
+        display: "flex",
+        flexDirection: "column",
+        gap: 16,
+        width: "100%",
+      }}
     >
-      {header}
-      <div className={isDesktop ? "grid grid-cols-3 gap-4" : "space-y-4"}>
-        <div className={isDesktop ? "col-span-2" : ""}>{statsBanner}</div>
-        <div>{searchBar}</div>
+      {/* Hero */}
+      <div
+        style={{
+          position: "relative",
+          overflow: "hidden",
+          borderRadius: 28,
+          padding: isDesktop ? "22px 26px" : "18px 18px",
+          background:
+            "linear-gradient(135deg, #FFEBC8 0%, #FFF7E5 55%, #FFFFFF 100%)",
+          boxShadow: PILLOW,
+        }}
+      >
+        <DotScribbles color={BUTTER} dense />
+        <div
+          style={{
+            position: "relative",
+            zIndex: 1,
+            display: "flex",
+            alignItems: "center",
+            gap: 14,
+            flexWrap: "wrap",
+          }}
+        >
+          <span
+            style={{
+              width: 52,
+              height: 52,
+              borderRadius: 18,
+              background: `linear-gradient(135deg, ${BUTTER}, ${PEACH})`,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: 26,
+              boxShadow: `0 8px 18px ${BUTTER}55`,
+              transform: "rotate(-8deg)",
+              flexShrink: 0,
+            }}
+            aria-hidden
+          >
+            🍱
+          </span>
+          <div style={{ flex: 1, minWidth: 200 }}>
+            <p
+              style={{
+                fontSize: 11,
+                fontWeight: 800,
+                letterSpacing: "0.16em",
+                textTransform: "uppercase",
+                color: BUTTER,
+                opacity: 0.9,
+              }}
+            >
+              Tum-tum & sleepy
+            </p>
+            <h1
+              style={{
+                fontSize: isDesktop ? 26 : 21,
+                fontWeight: 800,
+                letterSpacing: "-0.6px",
+                color: NAVY,
+                marginTop: 2,
+              }}
+            >
+              Meals &amp; Nap{" "}
+              <span
+                aria-hidden
+                style={{ display: "inline-block", transform: "rotate(6deg)" }}
+              >
+                😴
+              </span>
+            </h1>
+            <p
+              style={{
+                fontSize: isDesktop ? 13 : 12,
+                fontWeight: 500,
+                color: "#64748B",
+                marginTop: 4,
+              }}
+            >
+              {primaryClass.name} · {format(new Date(), "EEEE, d MMM")} · Tap to
+              log a meal or toggle nap
+            </p>
+          </div>
+        </div>
       </div>
 
+      {/* 4-stat strip */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+          gap: 10,
+        }}
+      >
+        <CounterCard
+          label="Meals"
+          value={stats.mealsLogged}
+          emoji="🥣"
+          tone={BUTTER}
+          surface="linear-gradient(135deg, #FFEBC8 0%, #FFF7E5 100%)"
+        />
+        <CounterCard
+          label="Refused"
+          value={stats.refused}
+          emoji="🚫"
+          tone={stats.refused > 0 ? RED : "#94A3B8"}
+          surface={
+            stats.refused > 0
+              ? "linear-gradient(135deg, #FFD6D6 0%, #FFF1F1 100%)"
+              : "linear-gradient(135deg, #F1F5F9 0%, #FFFFFF 100%)"
+          }
+        />
+        <CounterCard
+          label="Naps"
+          value={stats.napsLogged}
+          emoji="🛏️"
+          tone={LAV}
+          surface="linear-gradient(135deg, #EDE2FF 0%, #F8F3FF 100%)"
+        />
+        <CounterCard
+          label="Napping"
+          value={stats.napping}
+          emoji="😴"
+          tone={stats.napping > 0 ? BLUSH : "#94A3B8"}
+          surface={
+            stats.napping > 0
+              ? "linear-gradient(135deg, #FFE0EC 0%, #FFF4F8 100%)"
+              : "linear-gradient(135deg, #F1F5F9 0%, #FFFFFF 100%)"
+          }
+          pulse={stats.napping > 0}
+        />
+      </div>
+
+      {/* Search */}
+      <SearchPillow value={search} onChange={setSearch} />
+
+      {/* Roster */}
       {filtered.length === 0 ? (
-        <Card>
-          <CardContent className="p-6 text-center text-xs text-muted-foreground">
-            No children match.
-          </CardContent>
-        </Card>
+        <EmptyState
+          emoji="🔍"
+          title="No children match"
+          subtitle={`Nothing matches "${search}".`}
+        />
       ) : (
         <div
-          className={cn(
-            isDesktop
-              ? "grid grid-cols-2 xl:grid-cols-3 gap-3"
-              : "space-y-2"
-          )}
+          style={{
+            display: "grid",
+            gridTemplateColumns: cardCols,
+            gap: 12,
+          }}
         >
           {filtered.map((s) => (
             <ChildCard
@@ -282,129 +411,217 @@ export default function MealsNap() {
               busy={busy}
               onMeal={() => openMeal(s.child)}
               onNapToggle={() => handleNapToggle(s.child, s.nap)}
-              onUndoMeal={() => {
-                undoLastMeal(s.child.id);
-              }}
+              onUndoMeal={() => undoLastMeal(s.child.id)}
             />
           ))}
         </div>
       )}
 
+      {/* Meal composer sheet */}
       {sheet?.mode === "meal" && (
-        <div
-          className="fixed inset-0 z-50 flex items-end lg:items-center justify-center bg-black/40 backdrop-blur-sm animate-fade-in"
-          onClick={() => !busy && setSheet(null)}
-        >
-          <div
-            className={cn(
-              "w-full bg-white pb-[env(safe-area-inset-bottom)] max-h-[90vh] overflow-y-auto animate-slide-up",
-              isDesktop
-                ? "max-w-md rounded-3xl shadow-2xl"
-                : "max-w-md rounded-t-3xl"
-            )}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="px-5 pt-4 pb-2 flex items-start justify-between">
-              <div className="min-w-0">
-                <p className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground">
-                  Log meal
-                </p>
-                <p className="text-lg font-black text-edu-navy truncate">
-                  {sheet.child.name}
-                </p>
-                {sheet.child.allergies && sheet.child.allergies.length > 0 && (
-                  <div className="flex items-center gap-1 mt-1 text-edu-red text-[11px] font-bold">
-                    <AlertTriangle className="w-3 h-3" />
-                    Allergies: {sheet.child.allergies.join(", ")}
-                  </div>
-                )}
-              </div>
-              <button
-                type="button"
-                disabled={busy}
-                onClick={() => setSheet(null)}
-                className="w-8 h-8 rounded-full hover:bg-secondary/50 flex items-center justify-center"
-              >
-                <X className="w-4 h-4 text-muted-foreground" />
-              </button>
-            </div>
-
-            <div className="px-5 mt-3">
-              <p className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground mb-2">
-                Meal type
-              </p>
-              <div className="grid grid-cols-2 gap-2">
-                {MEAL_TYPES.map((t) => (
-                  <button
-                    key={t}
-                    type="button"
-                    onClick={() => setMealType(t)}
-                    className={cn(
-                      "h-14 rounded-2xl border-2 text-xs font-bold transition active:scale-95",
-                      mealType === t
-                        ? "border-edu-blue bg-edu-light-blue text-edu-blue"
-                        : "border-border text-foreground bg-white"
-                    )}
-                  >
-                    <div className="text-lg leading-none">
-                      {MEAL_TYPE_EMOJI[t]}
-                    </div>
-                    <div className="mt-0.5">{MEAL_TYPE_LABEL[t]}</div>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="px-5 mt-4">
-              <p className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground mb-2">
-                Portion eaten
-              </p>
-              <div className="grid grid-cols-4 gap-2">
-                {PORTIONS.map((p) => (
-                  <button
-                    key={p}
-                    type="button"
-                    onClick={() => setPortion(p)}
-                    className={cn(
-                      "h-14 rounded-2xl border-2 text-xs font-bold transition active:scale-95",
-                      portion === p
-                        ? PORTION_COLOR[p]
-                        : "border-border text-foreground bg-white"
-                    )}
-                  >
-                    <div className="text-base font-black leading-none">
-                      {PORTION_PERCENT[p]}%
-                    </div>
-                    <div className="mt-0.5">{PORTION_LABEL[p]}</div>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="px-5 mt-4 pb-5">
-              <label className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground mb-1.5 block">
-                Note (optional)
-              </label>
-              <textarea
-                value={note}
-                onChange={(e) => setNote(e.target.value)}
-                placeholder="Anything to share with parent?"
-                rows={2}
-                className="w-full rounded-xl border border-border px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-edu-blue/30"
-              />
-              <button
-                type="button"
-                disabled={busy}
-                onClick={submitMeal}
-                className="mt-3 w-full h-12 rounded-xl bg-edu-navy text-white font-bold flex items-center justify-center gap-2 disabled:opacity-50 active:scale-95 transition"
-              >
-                {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-                Save meal
-              </button>
-            </div>
-          </div>
-        </div>
+        <MealSheet
+          isDesktop={isDesktop}
+          child={sheet.child}
+          mealType={mealType}
+          setMealType={setMealType}
+          portion={portion}
+          setPortion={setPortion}
+          note={note}
+          setNote={setNote}
+          busy={busy}
+          onSubmit={submitMeal}
+          onClose={() => !busy && setSheet(null)}
+        />
       )}
+    </div>
+  );
+}
+
+/* ═══════════════════════ building blocks ═══════════════════════ */
+
+function CenteredLoader({ label }: { label: string }) {
+  return (
+    <div
+      style={{
+        padding: "48px 16px",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        gap: 12,
+        color: "#64748B",
+      }}
+    >
+      <Loader2 className="animate-spin" />
+      <p style={{ fontSize: 12, fontWeight: 600 }}>{label}</p>
+    </div>
+  );
+}
+
+function CounterCard({
+  label,
+  value,
+  emoji,
+  tone,
+  surface,
+  pulse,
+}: {
+  label: string;
+  value: number;
+  emoji: string;
+  tone: string;
+  surface: string;
+  pulse?: boolean;
+}) {
+  return (
+    <div
+      style={{
+        position: "relative",
+        overflow: "hidden",
+        borderRadius: 22,
+        padding: "12px 12px 10px",
+        background: surface,
+        boxShadow: PILLOW,
+        animation: pulse ? "pulse 2s ease-in-out infinite" : undefined,
+      }}
+    >
+      <DotScribbles color={tone} />
+      <div
+        style={{
+          display: "flex",
+          alignItems: "baseline",
+          justifyContent: "space-between",
+          position: "relative",
+          zIndex: 1,
+        }}
+      >
+        <span
+          style={{
+            fontSize: 28,
+            fontWeight: 900,
+            letterSpacing: "-1.2px",
+            color: tone,
+            lineHeight: 1,
+          }}
+        >
+          {value}
+        </span>
+        <span
+          style={{
+            fontSize: 20,
+            lineHeight: 1,
+            transform: "rotate(8deg)",
+            filter: "drop-shadow(0 3px 6px rgba(0,0,0,0.08))",
+          }}
+          aria-hidden
+        >
+          {emoji}
+        </span>
+      </div>
+      <p
+        style={{
+          fontSize: 10,
+          fontWeight: 800,
+          letterSpacing: "0.12em",
+          textTransform: "uppercase",
+          color: tone,
+          opacity: 0.75,
+          marginTop: 6,
+          position: "relative",
+          zIndex: 1,
+        }}
+      >
+        {label}
+      </p>
+    </div>
+  );
+}
+
+function SearchPillow({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  return (
+    <div
+      style={{
+        position: "relative",
+        borderRadius: 22,
+        background: "#fff",
+        boxShadow: PILLOW,
+        padding: "4px 4px 4px 14px",
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+      }}
+    >
+      <Search size={16} color="#94A3B8" strokeWidth={2.4} />
+      <input
+        placeholder="Search a child…"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        style={{
+          flex: 1,
+          background: "transparent",
+          border: "none",
+          outline: "none",
+          fontSize: 14,
+          fontWeight: 600,
+          color: "#0F172A",
+          padding: "12px 8px",
+          minWidth: 0,
+        }}
+      />
+      {value && (
+        <button
+          type="button"
+          onClick={() => onChange("")}
+          style={{
+            width: 32,
+            height: 32,
+            borderRadius: 999,
+            background: "#F1F5F9",
+            border: "none",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            cursor: "pointer",
+            flexShrink: 0,
+            marginRight: 4,
+          }}
+        >
+          <X size={14} color="#64748B" strokeWidth={2.4} />
+        </button>
+      )}
+    </div>
+  );
+}
+
+function EmptyState({
+  emoji,
+  title,
+  subtitle,
+}: {
+  emoji: string;
+  title: string;
+  subtitle: string;
+}) {
+  return (
+    <div
+      style={{
+        textAlign: "center",
+        padding: "32px 16px",
+        borderRadius: 22,
+        background: "#fff",
+        boxShadow: PILLOW,
+      }}
+    >
+      <p style={{ fontSize: 32, marginBottom: 8 }} aria-hidden>
+        {emoji}
+      </p>
+      <p style={{ fontSize: 14, fontWeight: 800, color: NAVY }}>{title}</p>
+      <p style={{ fontSize: 12, color: "#64748B", marginTop: 4 }}>{subtitle}</p>
     </div>
   );
 }
@@ -424,117 +641,677 @@ function ChildCard({
 }) {
   const { child, meals, nap, lastMeal } = summary;
   const napping = !!nap && !nap.endTime;
+  const hasAllergies = (child.allergies?.length || 0) > 0;
+
+  const surface = napping
+    ? "linear-gradient(135deg, #FFE0EC 0%, #FFF4F8 100%)"
+    : hasAllergies
+    ? "linear-gradient(135deg, #FFEBC8 0%, #FFF7E5 100%)"
+    : "linear-gradient(135deg, #FFF1E0 0%, #FFFAF1 100%)";
+  const scribble = napping ? BLUSH : hasAllergies ? BUTTER : PEACH;
+  const ring = napping ? BLUSH : hasAllergies ? BUTTER : PEACH;
 
   return (
-    <Card className={cn(napping && "border-edu-pink/40 bg-edu-pink/10")}>
-      <CardContent className="p-3 space-y-3">
-        <div className="flex items-center gap-3">
-          <Avatar name={child.name} photoURL={child.photoURL} />
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-bold text-edu-navy truncate">
-              {child.name}
+    <div
+      style={{
+        position: "relative",
+        overflow: "hidden",
+        borderRadius: 22,
+        background: surface,
+        boxShadow: PILLOW,
+        padding: 14,
+        display: "flex",
+        flexDirection: "column",
+        gap: 10,
+        animation: napping ? "pulse 3s ease-in-out infinite" : undefined,
+      }}
+    >
+      <DotScribbles color={scribble} />
+
+      <div
+        style={{
+          position: "relative",
+          zIndex: 1,
+          display: "flex",
+          alignItems: "center",
+          gap: 12,
+        }}
+      >
+        <div style={{ position: "relative", flexShrink: 0 }}>
+          <CartoonAvatar
+            name={child.name}
+            size={48}
+            ringColor={ring}
+            ringWidth={3}
+          />
+          {napping && (
+            <span
+              aria-hidden
+              style={{
+                position: "absolute",
+                bottom: -2,
+                right: -2,
+                width: 20,
+                height: 20,
+                borderRadius: 999,
+                background: BLUSH,
+                color: "#fff",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                boxShadow: `0 4px 10px ${BLUSH}66`,
+                border: "2px solid #fff",
+                transform: "rotate(8deg)",
+                fontSize: 11,
+              }}
+            >
+              😴
+            </span>
+          )}
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <p
+            style={{
+              fontSize: 14,
+              fontWeight: 800,
+              color: NAVY,
+              letterSpacing: "-0.2px",
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+            }}
+          >
+            {child.name}
+          </p>
+          <p
+            style={{
+              fontSize: 11,
+              fontWeight: 600,
+              color: "#64748B",
+              marginTop: 2,
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+            }}
+          >
+            {meals.length} meals
+            {lastMeal &&
+              ` · last ${MEAL_TYPE_EMOJI[lastMeal.mealType]} ${lastMeal.time}`}
+            {nap && nap.endTime && ` · nap ${nap.startTime}-${nap.endTime}`}
+            {napping && ` · napping since ${nap?.startTime}`}
+          </p>
+          {hasAllergies && (
+            <p
+              style={{
+                fontSize: 10,
+                fontWeight: 800,
+                color: "#92400E",
+                marginTop: 4,
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 3,
+              }}
+            >
+              <AlertTriangle size={9} strokeWidth={2.6} />
+              {child.allergies!.join(", ")}
             </p>
-            <p className="text-[11px] text-muted-foreground truncate">
-              {meals.length} meals
-              {lastMeal && ` · last ${MEAL_TYPE_EMOJI[lastMeal.mealType]} ${lastMeal.time}`}
-              {nap && nap.endTime && ` · nap ${nap.startTime}-${nap.endTime}`}
-              {napping && ` · 😴 napping since ${nap?.startTime}`}
-            </p>
-            {child.allergies && child.allergies.length > 0 && (
-              <p className="text-[10px] text-edu-red font-bold mt-0.5 truncate">
-                <AlertTriangle className="w-2.5 h-2.5 inline mb-0.5" /> Allergies: {child.allergies.join(", ")}
-              </p>
-            )}
+          )}
+        </div>
+      </div>
+
+      <div
+        style={{
+          position: "relative",
+          zIndex: 1,
+          display: "grid",
+          gridTemplateColumns: "1fr 1fr",
+          gap: 8,
+        }}
+      >
+        <button
+          type="button"
+          onClick={onMeal}
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 5,
+            padding: "9px 12px",
+            borderRadius: 14,
+            background: `linear-gradient(135deg, ${PEACH}, #EA580C)`,
+            color: "#fff",
+            fontSize: 12,
+            fontWeight: 800,
+            border: "none",
+            cursor: "pointer",
+            boxShadow: `0 8px 18px -6px ${PEACH}66`,
+          }}
+          className="active:scale-95 hover:-translate-y-0.5 transition"
+        >
+          <Utensils size={13} strokeWidth={2.6} />
+          Log meal
+        </button>
+        <button
+          type="button"
+          onClick={onNapToggle}
+          disabled={busy}
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 5,
+            padding: "9px 12px",
+            borderRadius: 14,
+            background: napping
+              ? `linear-gradient(135deg, ${BLUSH}, #DB2777)`
+              : `linear-gradient(135deg, ${LAV}, #7C3AED)`,
+            color: "#fff",
+            fontSize: 12,
+            fontWeight: 800,
+            border: "none",
+            cursor: busy ? "default" : "pointer",
+            opacity: busy ? 0.7 : 1,
+            boxShadow: napping
+              ? `0 8px 18px -6px ${BLUSH}66`
+              : `0 8px 18px -6px ${LAV}55`,
+          }}
+          className="active:scale-95 hover:-translate-y-0.5 transition"
+        >
+          <Moon size={13} strokeWidth={2.6} />
+          {napping ? "End nap" : "Start nap"}
+        </button>
+      </div>
+
+      {lastMeal && (
+        <button
+          type="button"
+          onClick={onUndoMeal}
+          style={{
+            position: "relative",
+            zIndex: 1,
+            fontSize: 11,
+            fontWeight: 700,
+            color: "#64748B",
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 4,
+            background: "transparent",
+            border: "none",
+            cursor: "pointer",
+            alignSelf: "flex-start",
+            padding: 0,
+          }}
+          className="hover:text-edu-red"
+        >
+          <Undo2 size={11} strokeWidth={2.4} />
+          Undo last meal
+        </button>
+      )}
+    </div>
+  );
+}
+
+/* ═══════════════════════ Meal composer ═══════════════════════ */
+
+function MealSheet({
+  isDesktop,
+  child,
+  mealType,
+  setMealType,
+  portion,
+  setPortion,
+  note,
+  setNote,
+  busy,
+  onSubmit,
+  onClose,
+}: {
+  isDesktop: boolean;
+  child: RosterChild;
+  mealType: MealType;
+  setMealType: (v: MealType) => void;
+  portion: Portion;
+  setPortion: (v: Portion) => void;
+  note: string;
+  setNote: (v: string) => void;
+  busy: boolean;
+  onSubmit: () => void;
+  onClose: () => void;
+}) {
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 50,
+        background: "rgba(15,23,42,0.5)",
+        backdropFilter: "blur(4px)",
+        WebkitBackdropFilter: "blur(4px)",
+        display: "flex",
+        alignItems: isDesktop ? "center" : "flex-end",
+        justifyContent: "center",
+        animation: "fade-in 200ms ease-out",
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          width: "100%",
+          maxWidth: isDesktop ? 520 : 480,
+          maxHeight: isDesktop ? "92vh" : "94vh",
+          overflowY: "auto",
+          background:
+            "linear-gradient(180deg, #FFF7E5 0%, #FFFFFF 28%, #FFFFFF 100%)",
+          borderRadius: isDesktop ? 28 : "28px 28px 0 0",
+          boxShadow: "0 -20px 60px rgba(15,23,42,0.18)",
+          animation: "slide-up 240ms cubic-bezier(.34,1.56,.64,1)",
+          position: "relative",
+          margin: isDesktop ? "0 16px" : 0,
+          paddingBottom: "env(safe-area-inset-bottom)",
+        }}
+      >
+        {/* Sticky header */}
+        <div
+          style={{
+            position: "sticky",
+            top: 0,
+            background:
+              "linear-gradient(180deg, rgba(255,247,229,0.95) 0%, rgba(255,255,255,0.85) 100%)",
+            backdropFilter: "blur(10px)",
+            WebkitBackdropFilter: "blur(10px)",
+            padding: isDesktop ? "16px 22px 14px" : "10px 18px 12px",
+            borderRadius: isDesktop ? "28px 28px 0 0" : "28px 28px 0 0",
+            zIndex: 10,
+          }}
+        >
+          {!isDesktop && (
+            <div
+              style={{
+                width: 48,
+                height: 5,
+                borderRadius: 999,
+                background: "#E2E8F0",
+                margin: "0 auto 12px",
+              }}
+            />
+          )}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 12,
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 12,
+                flex: 1,
+                minWidth: 0,
+              }}
+            >
+              <CartoonAvatar
+                name={child.name}
+                size={48}
+                ringColor={BUTTER}
+                ringWidth={3}
+              />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <p
+                  style={{
+                    fontSize: 10,
+                    fontWeight: 800,
+                    letterSpacing: "0.16em",
+                    textTransform: "uppercase",
+                    color: BUTTER,
+                    opacity: 0.85,
+                  }}
+                >
+                  Log meal
+                </p>
+                <h2
+                  style={{
+                    fontSize: 17,
+                    fontWeight: 800,
+                    letterSpacing: "-0.3px",
+                    color: NAVY,
+                    marginTop: 2,
+                    whiteSpace: "nowrap",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                  }}
+                >
+                  {child.name}{" "}
+                  <span
+                    aria-hidden
+                    style={{
+                      display: "inline-block",
+                      transform: "rotate(-6deg)",
+                      fontSize: 15,
+                    }}
+                  >
+                    🥄
+                  </span>
+                </h2>
+                {child.allergies && child.allergies.length > 0 && (
+                  <p
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 4,
+                      marginTop: 4,
+                      fontSize: 10,
+                      fontWeight: 800,
+                      color: RED,
+                    }}
+                  >
+                    <AlertTriangle size={11} strokeWidth={2.6} />
+                    Allergies: {child.allergies.join(", ")}
+                  </p>
+                )}
+              </div>
+            </div>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={onClose}
+              aria-label="Close"
+              style={{
+                width: 34,
+                height: 34,
+                borderRadius: 999,
+                background: "#F1F5F9",
+                border: "none",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                cursor: busy ? "default" : "pointer",
+                flexShrink: 0,
+              }}
+            >
+              <X size={16} color="#64748B" strokeWidth={2.4} />
+            </button>
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-2">
+        <div
+          style={{
+            padding: isDesktop ? "16px 22px 24px" : "12px 18px 24px",
+            display: "flex",
+            flexDirection: "column",
+            gap: 14,
+          }}
+        >
+          {/* Meal type tiles */}
+          <div>
+            <FieldLabel emoji="🍽️">Meal type</FieldLabel>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+                gap: 8,
+              }}
+            >
+              {MEAL_TYPES.map((t) => {
+                const mt = MEAL_TONE[t];
+                const selected = mealType === t;
+                return (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => setMealType(t)}
+                    style={{
+                      position: "relative",
+                      overflow: "hidden",
+                      padding: "12px 10px",
+                      borderRadius: 16,
+                      background: selected ? mt.surface : "#fff",
+                      border: "none",
+                      cursor: "pointer",
+                      boxShadow: selected
+                        ? `inset 0 0 0 2px ${mt.tone}, ${PILLOW}`
+                        : PILLOW,
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      gap: 4,
+                      transition: "transform 140ms ease",
+                    }}
+                    className="active:scale-95"
+                  >
+                    <span
+                      style={{
+                        fontSize: 22,
+                        transform: selected ? "rotate(-6deg)" : "none",
+                        transition: "transform 200ms ease",
+                      }}
+                      aria-hidden
+                    >
+                      {MEAL_TYPE_EMOJI[t]}
+                    </span>
+                    <span
+                      style={{
+                        fontSize: 12,
+                        fontWeight: 800,
+                        color: selected ? mt.tone : "#475569",
+                      }}
+                    >
+                      {MEAL_TYPE_LABEL[t]}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Portion tiles */}
+          <div>
+            <FieldLabel emoji="🥄">Portion eaten</FieldLabel>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+                gap: 6,
+              }}
+            >
+              {PORTIONS.map((p) => {
+                const pt = PORTION_TONE[p];
+                const selected = portion === p;
+                return (
+                  <button
+                    key={p}
+                    type="button"
+                    onClick={() => setPortion(p)}
+                    style={{
+                      position: "relative",
+                      overflow: "hidden",
+                      padding: "10px 4px",
+                      borderRadius: 14,
+                      background: selected
+                        ? `linear-gradient(135deg, ${pt.tone}, ${pt.tone}cc)`
+                        : "#fff",
+                      color: selected ? "#fff" : pt.tone,
+                      border: "none",
+                      cursor: "pointer",
+                      boxShadow: selected
+                        ? `0 8px 18px -6px ${pt.tone}66`
+                        : PILLOW,
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      gap: 2,
+                      transition: "transform 140ms ease",
+                    }}
+                    className="active:scale-95"
+                  >
+                    <span
+                      style={{
+                        fontSize: 16,
+                        fontWeight: 900,
+                        letterSpacing: "-0.4px",
+                      }}
+                    >
+                      {PORTION_PERCENT[p]}%
+                    </span>
+                    <span
+                      style={{
+                        fontSize: 10,
+                        fontWeight: 800,
+                        letterSpacing: "0.04em",
+                      }}
+                    >
+                      {PORTION_LABEL[p]}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Note */}
+          <div>
+            <FieldLabel emoji="📝">Note (optional)</FieldLabel>
+            <textarea
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="Anything to share with parent?"
+              rows={2}
+              style={{
+                width: "100%",
+                padding: "12px 14px",
+                borderRadius: 16,
+                background: "#fff",
+                border: "none",
+                fontSize: 12,
+                fontWeight: 500,
+                color: "#0F172A",
+                outline: "none",
+                resize: "none",
+                boxShadow: PILLOW,
+                fontFamily: "inherit",
+                lineHeight: 1.55,
+              }}
+            />
+          </div>
+
+          {/* Submit */}
           <button
             type="button"
-            onClick={onMeal}
-            className="h-10 rounded-lg bg-edu-light-blue text-edu-blue border-2 border-edu-blue/30 font-bold text-xs flex items-center justify-center gap-1 active:scale-95"
-          >
-            <Utensils className="w-3.5 h-3.5" /> Log meal
-          </button>
-          <button
-            type="button"
-            onClick={onNapToggle}
             disabled={busy}
-            className={cn(
-              "h-10 rounded-lg border-2 font-bold text-xs flex items-center justify-center gap-1 active:scale-95",
-              napping
-                ? "bg-edu-pink/20 text-edu-pink border-edu-pink/40"
-                : "bg-edu-light-yellow text-edu-yellow border-edu-yellow/40"
-            )}
+            onClick={onSubmit}
+            style={{
+              width: "100%",
+              padding: "14px 18px",
+              borderRadius: 18,
+              background: busy
+                ? "#CBD5E1"
+                : `linear-gradient(135deg, ${PEACH}, #EA580C)`,
+              color: "#fff",
+              fontSize: 14,
+              fontWeight: 800,
+              letterSpacing: "-0.1px",
+              border: "none",
+              cursor: busy ? "default" : "pointer",
+              boxShadow: busy ? "none" : `0 12px 28px -8px ${PEACH}88`,
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 8,
+            }}
+            className="active:scale-95 hover:-translate-y-0.5 transition"
           >
-            <Moon className="w-3.5 h-3.5" />
-            {napping ? "End nap" : "Start nap"}
+            {busy ? (
+              <Loader2 size={16} className="animate-spin" />
+            ) : (
+              <Utensils size={16} strokeWidth={2.4} />
+            )}
+            Save meal
           </button>
         </div>
-
-        {lastMeal && (
-          <button
-            type="button"
-            onClick={onUndoMeal}
-            className="text-[10px] font-bold text-muted-foreground flex items-center gap-1 hover:text-edu-red"
-          >
-            <Undo2 className="w-3 h-3" /> Undo last meal
-          </button>
-        )}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }
 
-function Stat({
-  label,
-  value,
-  warn,
-  live,
+function FieldLabel({
+  emoji,
+  children,
 }: {
-  label: string;
-  value: number;
-  warn?: boolean;
-  live?: boolean;
+  emoji?: string;
+  children: React.ReactNode;
 }) {
   return (
-    <div className="text-center">
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 6,
+        marginBottom: 8,
+      }}
+    >
+      {emoji && (
+        <span
+          aria-hidden
+          style={{
+            fontSize: 13,
+            transform: "rotate(-6deg)",
+            display: "inline-block",
+          }}
+        >
+          {emoji}
+        </span>
+      )}
       <p
-        className={cn(
-          "text-2xl font-black leading-none",
-          warn && "text-edu-yellow",
-          live && "text-edu-pink"
-        )}
+        style={{
+          fontSize: 10,
+          fontWeight: 800,
+          letterSpacing: "0.14em",
+          textTransform: "uppercase",
+          color: NAVY,
+          opacity: 0.75,
+        }}
       >
-        {value}
-        {live && <span className="w-1.5 h-1.5 bg-edu-pink rounded-full inline-block ml-1 animate-pulse" />}
-      </p>
-      <p className="text-[10px] text-white/80 mt-1 uppercase tracking-wider">
-        {label}
+        {children}
       </p>
     </div>
   );
 }
 
-function Avatar({ name, photoURL }: { name: string; photoURL?: string }) {
-  const initials = name
-    .split(/\s+/)
-    .map((w) => w[0])
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
-  if (photoURL) {
-    return (
-      <img
-        src={photoURL}
-        alt={name}
-        className="w-10 h-10 rounded-xl object-cover"
-      />
-    );
-  }
+function DotScribbles({
+  color,
+  dense = false,
+}: {
+  color: string;
+  dense?: boolean;
+}) {
   return (
-    <div className="w-10 h-10 rounded-xl bg-edu-light-blue text-edu-blue flex items-center justify-center font-black text-sm">
-      {initials}
-    </div>
+    <svg
+      aria-hidden="true"
+      width="100%"
+      height="100%"
+      style={{
+        position: "absolute",
+        inset: 0,
+        opacity: dense ? 0.1 : 0.07,
+        pointerEvents: "none",
+      }}
+    >
+      <circle cx="14%" cy="24%" r="2.5" fill={color} />
+      <circle cx="82%" cy="14%" r="1.8" fill={color} />
+      <circle cx="68%" cy="62%" r="2" fill={color} />
+      <circle cx="22%" cy="80%" r="1.6" fill={color} />
+      <circle cx="48%" cy="32%" r="1.4" fill={color} />
+      {dense && (
+        <>
+          <circle cx="90%" cy="80%" r="2.2" fill={color} />
+          <circle cx="6%" cy="60%" r="1.4" fill={color} />
+          <circle cx="55%" cy="88%" r="1.6" fill={color} />
+        </>
+      )}
+    </svg>
   );
 }
+

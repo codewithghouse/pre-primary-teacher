@@ -1,24 +1,17 @@
 import { useMemo, useState } from "react";
 import {
-  Droplet,
   Loader2,
-  Toilet,
-  CheckCircle2,
   X,
   Undo2,
   Clock,
-  Sparkles,
   Search,
 } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
-import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
 import { useTeacherClass } from "@/hooks/useTeacherClass";
 import { useClassRoster, type RosterChild } from "@/hooks/useClassRoster";
 import { useIsDesktop } from "@/hooks/useIsDesktop";
+import { CartoonAvatar } from "@/components/CartoonAvatar";
 import {
   usePPDiaperLogs,
   type DiaperType,
@@ -26,6 +19,24 @@ import {
   DIAPER_TYPE_LABEL,
   DIAPER_TYPE_EMOJI,
 } from "@/hooks/usePPDiaperLogs";
+
+/* ═══════════════════════════════════════════════════════════════════════
+   PRE-PRIMARY TEACHER · DIAPER & WASHROOM LOG
+   Storybook-sherbet quick-log surface. CartoonAvatar in every row,
+   sherbet quick-log tiles, distinct mobile bottom-sheet / desktop side.
+   ════════════════════════════════════════════════════════════════════════ */
+
+const NAVY = "#1e3272";
+const MINT = "#10B981";
+const PEACH = "#FB923C";
+const BLUSH = "#EC4899";
+const SKY = "#0EA5E9";
+const LAV = "#A78BFA";
+const BUTTER = "#F59E0B";
+const RED = "#EF4444";
+
+const PILLOW =
+  "0 1px 0 rgba(255,255,255,0.55) inset, 0 14px 32px -10px rgba(30,50,114,0.16), 0 4px 10px rgba(30,50,114,0.06)";
 
 const DIAPER_TYPES: DiaperType[] = [
   "wet",
@@ -35,12 +46,35 @@ const DIAPER_TYPES: DiaperType[] = [
   "washroom",
 ];
 
-const TYPE_COLOR: Record<DiaperType, string> = {
-  wet: "bg-edu-light-blue text-edu-blue border-edu-blue/30",
-  soiled: "bg-edu-light-orange text-edu-orange border-edu-orange/40",
-  mixed: "bg-edu-light-red text-edu-red border-edu-red/30",
-  dry_check: "bg-edu-light-green text-edu-green border-edu-green/30",
-  washroom: "bg-edu-light-yellow text-edu-yellow border-edu-yellow/40",
+const TYPE_TONE: Record<
+  DiaperType,
+  { tone: string; surface: string; bar: string }
+> = {
+  wet: {
+    tone: SKY,
+    surface: "linear-gradient(135deg, #DCEEFF 0%, #F5FAFF 100%)",
+    bar: SKY,
+  },
+  soiled: {
+    tone: PEACH,
+    surface: "linear-gradient(135deg, #FFE0CC 0%, #FFF5EC 100%)",
+    bar: PEACH,
+  },
+  mixed: {
+    tone: RED,
+    surface: "linear-gradient(135deg, #FFD6D6 0%, #FFF1F1 100%)",
+    bar: RED,
+  },
+  dry_check: {
+    tone: MINT,
+    surface: "linear-gradient(135deg, #D6F5E2 0%, #F1FBF5 100%)",
+    bar: MINT,
+  },
+  washroom: {
+    tone: BUTTER,
+    surface: "linear-gradient(135deg, #FFEBC8 0%, #FFF7E5 100%)",
+    bar: BUTTER,
+  },
 };
 
 const minutesSince = (iso: string): number => {
@@ -113,39 +147,27 @@ export default function DiaperLog() {
     const total = data?.entries.length || 0;
     const uniqueKids = new Set((data?.entries || []).map((e) => e.studentId))
       .size;
-    return { total, uniqueKids };
-  }, [data?.entries]);
+    const overdue = summaries.filter(
+      (s) => s.minsSince !== null && s.minsSince > 180
+    ).length;
+    return { total, uniqueKids, overdue };
+  }, [data?.entries, summaries]);
 
   const activeChild = filtered.find((s) => s.child.id === activeChildId);
 
-  if (classLoading) {
-    return (
-      <div className="px-4 py-12 flex flex-col items-center text-muted-foreground gap-3">
-        <Loader2 className="w-6 h-6 animate-spin" />
-        <p className="text-xs">Resolving your class…</p>
-      </div>
-    );
-  }
-
+  if (classLoading)
+    return <CenteredLoader label="Resolving your class…" />;
   if (!primaryClass) {
     return (
-      <div className="px-4 py-12 text-center">
-        <p className="text-sm font-bold text-edu-navy">No class assigned</p>
-        <p className="text-xs text-muted-foreground mt-1">
-          Contact your principal to be added to a class.
+      <div style={{ padding: "48px 16px", textAlign: "center" }}>
+        <p style={{ fontSize: 16, fontWeight: 800, color: NAVY }}>
+          🌱 No class assigned
         </p>
       </div>
     );
   }
-
-  if (loading && roster.length === 0) {
-    return (
-      <div className="px-4 py-12 flex flex-col items-center text-muted-foreground gap-3">
-        <Loader2 className="w-6 h-6 animate-spin" />
-        <p className="text-xs">Loading diaper log…</p>
-      </div>
-    );
-  }
+  if (loading && roster.length === 0)
+    return <CenteredLoader label="Loading diaper log…" />;
 
   const handleQuickLog = async (
     child: RosterChild,
@@ -185,82 +207,306 @@ export default function DiaperLog() {
     }
   };
 
-  const sharedHeader = (
-    <div className="flex items-baseline justify-between pt-1">
-      <div>
-        <p className="text-xs text-muted-foreground font-semibold">
-          {format(new Date(), "EEEE, d MMM")} · {primaryClass.name}
-        </p>
-        <h1
-          className={cn(
-            "font-black text-edu-navy mt-0.5",
-            isDesktop ? "text-2xl" : "text-xl"
-          )}
-        >
-          Diaper &amp; Washroom 🚼
-        </h1>
-      </div>
-    </div>
-  );
-
-  const statsBanner = (
-    <div className="rounded-2xl bg-gradient-to-br from-edu-blue to-edu-navy text-white p-4 shadow-md">
-      <div className="flex items-center gap-2 text-[10px] uppercase tracking-widest text-white/70 font-bold">
-        <Sparkles className="w-3 h-3" />
-        Today
-      </div>
-      <div className="flex items-baseline gap-6 mt-1">
-        <div>
-          <p className="text-3xl font-black leading-none">{stats.total}</p>
-          <p className="text-[11px] text-white/80 mt-0.5">entries logged</p>
-        </div>
-        <div>
-          <p className="text-3xl font-black leading-none">
-            {stats.uniqueKids}/{roster.length || "—"}
-          </p>
-          <p className="text-[11px] text-white/80 mt-0.5">children changed</p>
-        </div>
-      </div>
-    </div>
-  );
-
-  const searchBar = (
-    <div className="relative">
-      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-      <Input
-        placeholder="Search a child…"
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        className="pl-9"
-      />
-    </div>
-  );
-
-  if (isDesktop) {
-    return (
-      <DesktopLayout
-        header={sharedHeader}
-        stats={statsBanner}
-        search={searchBar}
-        summaries={filtered}
-        allEntries={data?.entries || []}
-        onLog={handleQuickLog}
-        onUndo={handleUndo}
-        busyType={busyType}
-      />
-    );
-  }
+  const cardCols = isDesktop ? "repeat(3, minmax(0, 1fr))" : "1fr";
+  const allEntries = data?.entries || [];
 
   return (
     <>
-      <MobileLayout
-        header={sharedHeader}
-        stats={statsBanner}
-        search={searchBar}
-        summaries={filtered}
-        onOpen={(id) => setActiveChildId(id)}
-      />
-      {activeChild && (
+      <div
+        className="animate-fade-in"
+        style={{
+          padding: isDesktop ? "24px 28px 80px" : "16px 16px 80px",
+          display: "flex",
+          flexDirection: "column",
+          gap: 16,
+          width: "100%",
+        }}
+      >
+        {/* Hero */}
+        <div
+          style={{
+            position: "relative",
+            overflow: "hidden",
+            borderRadius: 28,
+            padding: isDesktop ? "22px 26px" : "18px 18px",
+            background:
+              "linear-gradient(135deg, #DCEEFF 0%, #F5FAFF 55%, #FFFFFF 100%)",
+            boxShadow: PILLOW,
+          }}
+        >
+          <DotScribbles color={SKY} dense />
+          <div
+            style={{
+              position: "relative",
+              zIndex: 1,
+              display: "flex",
+              alignItems: "center",
+              gap: 14,
+              flexWrap: "wrap",
+            }}
+          >
+            <span
+              style={{
+                width: 52,
+                height: 52,
+                borderRadius: 18,
+                background: `linear-gradient(135deg, ${SKY}, #0284C7)`,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: 26,
+                boxShadow: `0 8px 18px ${SKY}55`,
+                transform: "rotate(-8deg)",
+                flexShrink: 0,
+              }}
+              aria-hidden
+            >
+              🚼
+            </span>
+            <div style={{ flex: 1, minWidth: 200 }}>
+              <p
+                style={{
+                  fontSize: 11,
+                  fontWeight: 800,
+                  letterSpacing: "0.16em",
+                  textTransform: "uppercase",
+                  color: SKY,
+                  opacity: 0.9,
+                }}
+              >
+                Care log
+              </p>
+              <h1
+                style={{
+                  fontSize: isDesktop ? 26 : 21,
+                  fontWeight: 800,
+                  letterSpacing: "-0.6px",
+                  color: NAVY,
+                  marginTop: 2,
+                }}
+              >
+                Diaper &amp; Washroom{" "}
+                <span
+                  aria-hidden
+                  style={{ display: "inline-block", transform: "rotate(6deg)" }}
+                >
+                  💧
+                </span>
+              </h1>
+              <p
+                style={{
+                  fontSize: isDesktop ? 13 : 12,
+                  fontWeight: 500,
+                  color: "#64748B",
+                  marginTop: 4,
+                }}
+              >
+                {primaryClass.name} · {format(new Date(), "EEEE, d MMM")} · Tap
+                a child for quick-log
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* 3-stat strip */}
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+            gap: 10,
+          }}
+        >
+          <CounterCard
+            label="Entries"
+            value={stats.total}
+            emoji="📋"
+            tone={NAVY}
+            surface="linear-gradient(135deg, #E1ECFF 0%, #F7FAFF 100%)"
+          />
+          <CounterCard
+            label="Children"
+            value={stats.uniqueKids}
+            total={roster.length || undefined}
+            emoji="👶"
+            tone={SKY}
+            surface="linear-gradient(135deg, #DCEEFF 0%, #F5FAFF 100%)"
+          />
+          <CounterCard
+            label="Overdue >3h"
+            value={stats.overdue}
+            emoji="⏰"
+            tone={stats.overdue > 0 ? PEACH : MINT}
+            surface={
+              stats.overdue > 0
+                ? "linear-gradient(135deg, #FFE0CC 0%, #FFF5EC 100%)"
+                : "linear-gradient(135deg, #D6F5E2 0%, #F1FBF5 100%)"
+            }
+          />
+        </div>
+
+        {/* Search */}
+        <SearchPillow value={search} onChange={setSearch} />
+
+        {/* Main grid + (desktop only) timeline aside */}
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: isDesktop ? "2fr 1fr" : "1fr",
+            gap: 16,
+          }}
+        >
+          {/* Roster */}
+          <div>
+            {filtered.length === 0 ? (
+              <EmptyState
+                emoji="🔍"
+                title="No children match"
+                subtitle={`Nothing matches "${search}".`}
+              />
+            ) : (
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: cardCols,
+                  gap: 12,
+                }}
+              >
+                {filtered.map((s) => (
+                  <ChildCard
+                    key={s.child.id}
+                    summary={s}
+                    isDesktop={isDesktop}
+                    busyType={busyType}
+                    onTap={() => setActiveChildId(s.child.id)}
+                    onQuickLog={(t) => handleQuickLog(s.child, t, false)}
+                    onUndo={() => handleUndo(s.child)}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Desktop-only timeline aside */}
+          {isDesktop && (
+            <aside
+              style={{
+                position: "relative",
+                overflow: "hidden",
+                borderRadius: 22,
+                padding: 16,
+                background: "#fff",
+                boxShadow: PILLOW,
+                alignSelf: "start",
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  marginBottom: 12,
+                }}
+              >
+                <span
+                  aria-hidden
+                  style={{
+                    fontSize: 14,
+                    transform: "rotate(-6deg)",
+                    display: "inline-block",
+                  }}
+                >
+                  ⏱️
+                </span>
+                <p
+                  style={{
+                    fontSize: 10,
+                    fontWeight: 800,
+                    letterSpacing: "0.14em",
+                    textTransform: "uppercase",
+                    color: NAVY,
+                  }}
+                >
+                  Today's Timeline
+                </p>
+              </div>
+              {allEntries.length === 0 ? (
+                <p
+                  style={{
+                    fontSize: 12,
+                    color: "#94A3B8",
+                    textAlign: "center",
+                    padding: "16px 0",
+                  }}
+                >
+                  No entries yet.
+                </p>
+              ) : (
+                <ol
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 6,
+                    maxHeight: "70vh",
+                    overflowY: "auto",
+                    padding: 0,
+                    margin: 0,
+                    listStyle: "none",
+                  }}
+                >
+                  {[...allEntries]
+                    .sort((a, b) => (a.recordedAt < b.recordedAt ? 1 : -1))
+                    .map((e) => {
+                      const tt = TYPE_TONE[e.type];
+                      return (
+                        <li
+                          key={e.id}
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 8,
+                            padding: "8px 10px",
+                            borderRadius: 12,
+                            background: tt.surface,
+                            borderLeft: `3px solid ${tt.bar}`,
+                          }}
+                        >
+                          <span style={{ fontSize: 18 }} aria-hidden>
+                            {DIAPER_TYPE_EMOJI[e.type]}
+                          </span>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <p
+                              style={{
+                                fontSize: 11,
+                                fontWeight: 800,
+                                color: NAVY,
+                                whiteSpace: "nowrap",
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                              }}
+                            >
+                              {e.studentName}
+                            </p>
+                            <p
+                              style={{
+                                fontSize: 10,
+                                color: "#64748B",
+                              }}
+                            >
+                              {DIAPER_TYPE_LABEL[e.type]} · {e.time}
+                            </p>
+                          </div>
+                        </li>
+                      );
+                    })}
+                </ol>
+              )}
+            </aside>
+          )}
+        </div>
+      </div>
+
+      {/* Mobile child action sheet */}
+      {!isDesktop && activeChild && (
         <ChildActionSheet
           summary={activeChild}
           note={note}
@@ -278,88 +524,442 @@ export default function DiaperLog() {
   );
 }
 
-// ─── Mobile Layout ────────────────────────────────────────────────────────
-function MobileLayout({
-  header,
-  stats,
-  search,
-  summaries,
-  onOpen,
+/* ═══════════════════════ building blocks ═══════════════════════ */
+
+function CenteredLoader({ label }: { label: string }) {
+  return (
+    <div
+      style={{
+        padding: "48px 16px",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        gap: 12,
+        color: "#64748B",
+      }}
+    >
+      <Loader2 className="animate-spin" />
+      <p style={{ fontSize: 12, fontWeight: 600 }}>{label}</p>
+    </div>
+  );
+}
+
+function CounterCard({
+  label,
+  value,
+  total,
+  emoji,
+  tone,
+  surface,
 }: {
-  header: React.ReactNode;
-  stats: React.ReactNode;
-  search: React.ReactNode;
-  summaries: ChildSummary[];
-  onOpen: (id: string) => void;
+  label: string;
+  value: number;
+  total?: number;
+  emoji: string;
+  tone: string;
+  surface: string;
 }) {
   return (
-    <div className="px-4 py-4 space-y-4 animate-fade-in">
-      {header}
-      {stats}
-      {search}
+    <div
+      style={{
+        position: "relative",
+        overflow: "hidden",
+        borderRadius: 22,
+        padding: "12px 12px 10px",
+        background: surface,
+        boxShadow: PILLOW,
+      }}
+    >
+      <DotScribbles color={tone} />
+      <div
+        style={{
+          display: "flex",
+          alignItems: "baseline",
+          justifyContent: "space-between",
+          position: "relative",
+          zIndex: 1,
+          gap: 4,
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "baseline", gap: 2 }}>
+          <span
+            style={{
+              fontSize: 28,
+              fontWeight: 900,
+              letterSpacing: "-1.2px",
+              color: tone,
+              lineHeight: 1,
+            }}
+          >
+            {value}
+          </span>
+          {total !== undefined && (
+            <span
+              style={{
+                fontSize: 12,
+                fontWeight: 700,
+                color: tone,
+                opacity: 0.55,
+              }}
+            >
+              /{total}
+            </span>
+          )}
+        </div>
+        <span
+          style={{
+            fontSize: 20,
+            lineHeight: 1,
+            transform: "rotate(8deg)",
+            filter: "drop-shadow(0 3px 6px rgba(0,0,0,0.08))",
+          }}
+          aria-hidden
+        >
+          {emoji}
+        </span>
+      </div>
+      <p
+        style={{
+          fontSize: 10,
+          fontWeight: 800,
+          letterSpacing: "0.12em",
+          textTransform: "uppercase",
+          color: tone,
+          opacity: 0.75,
+          marginTop: 6,
+          position: "relative",
+          zIndex: 1,
+        }}
+      >
+        {label}
+      </p>
+    </div>
+  );
+}
 
-      {summaries.length === 0 ? (
-        <Card>
-          <CardContent className="p-6 text-center text-xs text-muted-foreground">
-            No children match.
-          </CardContent>
-        </Card>
-      ) : (
-        <ul className="space-y-2">
-          {summaries.map((s) => (
-            <li key={s.child.id}>
-              <button
-                type="button"
-                onClick={() => onOpen(s.child.id)}
-                className="w-full text-left active:scale-[0.99] transition"
-              >
-                <ChildRowCard summary={s} />
-              </button>
-            </li>
-          ))}
-        </ul>
+function SearchPillow({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  return (
+    <div
+      style={{
+        position: "relative",
+        borderRadius: 22,
+        background: "#fff",
+        boxShadow: PILLOW,
+        padding: "4px 4px 4px 14px",
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+      }}
+    >
+      <Search size={16} color="#94A3B8" strokeWidth={2.4} />
+      <input
+        placeholder="Search a child…"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        style={{
+          flex: 1,
+          background: "transparent",
+          border: "none",
+          outline: "none",
+          fontSize: 14,
+          fontWeight: 600,
+          color: "#0F172A",
+          padding: "12px 8px",
+          minWidth: 0,
+        }}
+      />
+      {value && (
+        <button
+          type="button"
+          onClick={() => onChange("")}
+          style={{
+            width: 32,
+            height: 32,
+            borderRadius: 999,
+            background: "#F1F5F9",
+            border: "none",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            cursor: "pointer",
+            flexShrink: 0,
+            marginRight: 4,
+          }}
+        >
+          <X size={14} color="#64748B" strokeWidth={2.4} />
+        </button>
       )}
     </div>
   );
 }
 
-function ChildRowCard({ summary }: { summary: ChildSummary }) {
+function EmptyState({
+  emoji,
+  title,
+  subtitle,
+}: {
+  emoji: string;
+  title: string;
+  subtitle: string;
+}) {
+  return (
+    <div
+      style={{
+        textAlign: "center",
+        padding: "32px 16px",
+        borderRadius: 22,
+        background: "#fff",
+        boxShadow: PILLOW,
+      }}
+    >
+      <p style={{ fontSize: 32, marginBottom: 8 }} aria-hidden>
+        {emoji}
+      </p>
+      <p style={{ fontSize: 14, fontWeight: 800, color: NAVY }}>{title}</p>
+      <p style={{ fontSize: 12, color: "#64748B", marginTop: 4 }}>{subtitle}</p>
+    </div>
+  );
+}
+
+function ChildCard({
+  summary,
+  isDesktop,
+  busyType,
+  onTap,
+  onQuickLog,
+  onUndo,
+}: {
+  summary: ChildSummary;
+  isDesktop: boolean;
+  busyType: DiaperType | null;
+  onTap: () => void;
+  onQuickLog: (type: DiaperType) => void;
+  onUndo: () => void;
+}) {
   const { child, lastEntry, todayCount, minsSince } = summary;
-  const overdue =
-    minsSince === null ? false : minsSince > 180; // 3hr threshold
+  const overdue = minsSince !== null && minsSince > 180;
+
+  const surface = overdue
+    ? "linear-gradient(135deg, #FFE0CC 0%, #FFF5EC 100%)"
+    : lastEntry
+    ? "linear-gradient(135deg, #ECF3FF 0%, #FAFCFF 100%)"
+    : "linear-gradient(135deg, #F8FAFC 0%, #FFFFFF 100%)";
+  const scribble = overdue ? PEACH : lastEntry ? SKY : NAVY;
+  const ring = overdue ? PEACH : lastEntry ? SKY : "#CBD5E1";
 
   return (
-    <Card
-      className={cn(
-        "border transition",
-        overdue && "border-edu-orange/60 bg-edu-light-orange/30",
-        !overdue && lastEntry && "border-border",
-        !lastEntry && "border-dashed border-border"
-      )}
+    <div
+      style={{
+        position: "relative",
+        overflow: "hidden",
+        borderRadius: 22,
+        background: surface,
+        boxShadow: PILLOW,
+        padding: 14,
+        display: "flex",
+        flexDirection: "column",
+        gap: 10,
+      }}
     >
-      <CardContent className="p-3 flex items-center gap-3">
-        <Avatar name={child.name} photoURL={child.photoURL} />
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-bold text-edu-navy truncate">
+      <DotScribbles color={scribble} />
+
+      <button
+        type="button"
+        onClick={onTap}
+        style={{
+          position: "relative",
+          zIndex: 1,
+          display: "flex",
+          alignItems: "center",
+          gap: 12,
+          background: "transparent",
+          border: "none",
+          padding: 0,
+          textAlign: "left",
+          cursor: "pointer",
+        }}
+        className="active:scale-[0.99] transition"
+      >
+        <CartoonAvatar
+          name={child.name}
+          size={48}
+          ringColor={ring}
+          ringWidth={3}
+        />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <p
+            style={{
+              fontSize: 14,
+              fontWeight: 800,
+              color: NAVY,
+              letterSpacing: "-0.2px",
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+            }}
+          >
             {child.name}
           </p>
           {lastEntry ? (
-            <p className="text-[11px] text-muted-foreground truncate">
+            <p
+              style={{
+                fontSize: 11,
+                fontWeight: 600,
+                color: overdue ? "#92400E" : "#64748B",
+                marginTop: 2,
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+              }}
+            >
               {DIAPER_TYPE_EMOJI[lastEntry.type]}{" "}
               {DIAPER_TYPE_LABEL[lastEntry.type]} · {sinceLabel(minsSince ?? 0)}
-              {todayCount > 1 && ` · ${todayCount}x today`}
+              {todayCount > 1 && ` · ${todayCount}×`}
             </p>
           ) : (
-            <p className="text-[11px] text-muted-foreground italic">
+            <p
+              style={{
+                fontSize: 11,
+                fontStyle: "italic",
+                color: "#94A3B8",
+                marginTop: 2,
+              }}
+            >
               Not logged yet today
             </p>
           )}
         </div>
-        <span className="text-[10px] uppercase tracking-wider font-bold text-edu-blue">
-          Log
-        </span>
-      </CardContent>
-    </Card>
+        {lastEntry && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onUndo();
+            }}
+            title="Undo last entry"
+            aria-label="Undo last entry"
+            style={{
+              flexShrink: 0,
+              width: 32,
+              height: 32,
+              borderRadius: 999,
+              background: "#fff",
+              border: "none",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              cursor: "pointer",
+              boxShadow: "inset 0 0 0 1px #CBD5E1",
+              color: "#64748B",
+            }}
+            className="hover:text-edu-red"
+          >
+            <Undo2 size={14} strokeWidth={2.4} />
+          </button>
+        )}
+      </button>
+
+      {/* Desktop-only inline 5-tile quick log; mobile uses bottom-sheet */}
+      {isDesktop && (
+        <div
+          style={{
+            position: "relative",
+            zIndex: 1,
+            display: "grid",
+            gridTemplateColumns: "repeat(5, minmax(0, 1fr))",
+            gap: 6,
+          }}
+        >
+          {DIAPER_TYPES.map((t) => (
+            <QuickTile
+              key={t}
+              type={t}
+              busy={busyType === t}
+              compact
+              onClick={() => onQuickLog(t)}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function QuickTile({
+  type,
+  busy,
+  compact,
+  onClick,
+}: {
+  type: DiaperType;
+  busy: boolean;
+  compact?: boolean;
+  onClick: () => void;
+}) {
+  const tt = TYPE_TONE[type];
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={busy}
+      title={DIAPER_TYPE_LABEL[type]}
+      style={{
+        position: "relative",
+        overflow: "hidden",
+        height: compact ? 44 : 72,
+        borderRadius: compact ? 12 : 18,
+        background: tt.surface,
+        border: "none",
+        cursor: busy ? "default" : "pointer",
+        opacity: busy ? 0.7 : 1,
+        boxShadow: `inset 0 0 0 2px ${tt.bar}33, 0 4px 10px ${tt.tone}1f`,
+        display: "flex",
+        flexDirection: compact ? "row" : "column",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: compact ? 0 : 4,
+        padding: compact ? 4 : 6,
+        transition: "transform 140ms ease",
+      }}
+      className="active:scale-95 hover:-translate-y-0.5"
+    >
+      {busy ? (
+        <Loader2 size={compact ? 14 : 18} className="animate-spin" color={tt.tone} />
+      ) : (
+        <>
+          <span
+            style={{
+              fontSize: compact ? 18 : 26,
+              lineHeight: 1,
+              transform: "rotate(-6deg)",
+              display: "inline-block",
+              filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.08))",
+            }}
+            aria-hidden
+          >
+            {DIAPER_TYPE_EMOJI[type]}
+          </span>
+          {!compact && (
+            <span
+              style={{
+                fontSize: 11,
+                fontWeight: 800,
+                color: tt.tone,
+                letterSpacing: "-0.1px",
+              }}
+            >
+              {DIAPER_TYPE_LABEL[type]}
+            </span>
+          )}
+        </>
+      )}
+    </button>
   );
 }
 
@@ -383,326 +983,305 @@ function ChildActionSheet({
   const { child, lastEntry, todayCount } = summary;
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 backdrop-blur-sm animate-fade-in"
       onClick={onClose}
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 50,
+        background: "rgba(15,23,42,0.5)",
+        backdropFilter: "blur(4px)",
+        WebkitBackdropFilter: "blur(4px)",
+        display: "flex",
+        alignItems: "flex-end",
+        justifyContent: "center",
+        animation: "fade-in 200ms ease-out",
+      }}
     >
       <div
-        className="w-full max-w-md bg-white rounded-t-3xl pb-[env(safe-area-inset-bottom)] max-h-[90vh] overflow-y-auto animate-slide-up"
         onClick={(e) => e.stopPropagation()}
+        style={{
+          width: "100%",
+          maxWidth: 480,
+          maxHeight: "92vh",
+          overflowY: "auto",
+          background:
+            "linear-gradient(180deg, #F0F9FF 0%, #FFFFFF 28%, #FFFFFF 100%)",
+          borderRadius: "28px 28px 0 0",
+          boxShadow: "0 -20px 60px rgba(15,23,42,0.18)",
+          animation: "slide-up 240ms cubic-bezier(.34,1.56,.64,1)",
+          position: "relative",
+          paddingBottom: "env(safe-area-inset-bottom)",
+        }}
       >
-        <div className="px-5 pt-4 pb-2 flex items-start justify-between">
-          <div className="flex items-center gap-3 min-w-0">
-            <Avatar name={child.name} photoURL={child.photoURL} size="lg" />
-            <div className="min-w-0">
-              <p className="text-lg font-black text-edu-navy truncate">
-                {child.name}
-              </p>
-              <p className="text-[11px] text-muted-foreground">
-                {todayCount} entries today
-              </p>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="w-8 h-8 rounded-full hover:bg-secondary/50 flex items-center justify-center"
+        {/* Sticky header */}
+        <div
+          style={{
+            position: "sticky",
+            top: 0,
+            background:
+              "linear-gradient(180deg, rgba(240,249,255,0.95) 0%, rgba(255,255,255,0.85) 100%)",
+            backdropFilter: "blur(10px)",
+            WebkitBackdropFilter: "blur(10px)",
+            padding: "10px 18px 12px",
+            borderRadius: "28px 28px 0 0",
+            zIndex: 10,
+          }}
+        >
+          <div
+            style={{
+              width: 48,
+              height: 5,
+              borderRadius: 999,
+              background: "#E2E8F0",
+              margin: "0 auto 12px",
+            }}
+          />
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 12,
+            }}
           >
-            <X className="w-4 h-4 text-muted-foreground" />
-          </button>
-        </div>
-
-        {lastEntry && (
-          <div className="mx-5 mt-2 rounded-xl bg-secondary/50 p-3 flex items-center gap-2">
-            <Clock className="w-4 h-4 text-muted-foreground" />
-            <p className="text-xs text-foreground/80 flex-1">
-              Last: {DIAPER_TYPE_EMOJI[lastEntry.type]}{" "}
-              {DIAPER_TYPE_LABEL[lastEntry.type]} at {lastEntry.time}
-              {lastEntry.note && ` · "${lastEntry.note}"`}
-            </p>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 12,
+                flex: 1,
+                minWidth: 0,
+              }}
+            >
+              <CartoonAvatar name={child.name} size={48} ringColor={SKY} ringWidth={3} />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <h2
+                  style={{
+                    fontSize: 17,
+                    fontWeight: 800,
+                    letterSpacing: "-0.3px",
+                    color: NAVY,
+                    whiteSpace: "nowrap",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                  }}
+                >
+                  {child.name}{" "}
+                  <span
+                    aria-hidden
+                    style={{
+                      display: "inline-block",
+                      transform: "rotate(-6deg)",
+                      fontSize: 15,
+                    }}
+                  >
+                    💧
+                  </span>
+                </h2>
+                <p style={{ fontSize: 11, fontWeight: 600, color: "#64748B", marginTop: 2 }}>
+                  {todayCount} entries today
+                </p>
+              </div>
+            </div>
             <button
               type="button"
-              onClick={onUndo}
-              className="text-[11px] font-bold text-edu-red flex items-center gap-1"
+              onClick={onClose}
+              aria-label="Close"
+              style={{
+                width: 34,
+                height: 34,
+                borderRadius: 999,
+                background: "#F1F5F9",
+                border: "none",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                cursor: "pointer",
+                flexShrink: 0,
+              }}
             >
-              <Undo2 className="w-3 h-3" />
-              Undo
+              <X size={16} color="#64748B" strokeWidth={2.4} />
             </button>
           </div>
-        )}
-
-        <div className="px-5 mt-4">
-          <p className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground mb-2">
-            Quick log
-          </p>
-          <div className="grid grid-cols-2 gap-2">
-            {DIAPER_TYPES.map((t) => (
-              <TypeButton
-                key={t}
-                type={t}
-                busy={busyType === t}
-                onClick={() => onLog(t)}
-              />
-            ))}
-          </div>
         </div>
 
-        <div className="px-5 mt-4 pb-5">
-          <label className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground mb-1.5 block">
-            Note (optional)
-          </label>
-          <textarea
-            value={note}
-            onChange={(e) => onNoteChange(e.target.value)}
-            placeholder="Anything to flag for parent?"
-            rows={2}
-            className="w-full rounded-xl border border-border px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-edu-blue/30"
-          />
-          <p className="text-[10px] text-muted-foreground mt-1">
-            Tip: rashes, leakage, or signs of discomfort.
-          </p>
-        </div>
-      </div>
-    </div>
-  );
-}
+        <div
+          style={{
+            padding: "12px 18px 24px",
+            display: "flex",
+            flexDirection: "column",
+            gap: 14,
+          }}
+        >
+          {lastEntry && (
+            <div
+              style={{
+                position: "relative",
+                overflow: "hidden",
+                borderRadius: 16,
+                padding: "10px 12px",
+                background: "#F8FAFC",
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+              }}
+            >
+              <Clock size={14} color="#64748B" />
+              <p style={{ fontSize: 11, color: "#0F172A", flex: 1, fontWeight: 500 }}>
+                Last: {DIAPER_TYPE_EMOJI[lastEntry.type]}{" "}
+                {DIAPER_TYPE_LABEL[lastEntry.type]} at {lastEntry.time}
+                {lastEntry.note && ` · "${lastEntry.note}"`}
+              </p>
+              <button
+                type="button"
+                onClick={onUndo}
+                style={{
+                  fontSize: 11,
+                  fontWeight: 800,
+                  color: RED,
+                  background: "transparent",
+                  border: "none",
+                  cursor: "pointer",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 3,
+                }}
+              >
+                <Undo2 size={12} strokeWidth={2.6} />
+                Undo
+              </button>
+            </div>
+          )}
 
-function TypeButton({
-  type,
-  busy,
-  onClick,
-}: {
-  type: DiaperType;
-  busy: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      disabled={busy}
-      onClick={onClick}
-      className={cn(
-        "h-16 rounded-2xl border-2 flex flex-col items-center justify-center gap-0.5 font-bold text-xs active:scale-95 transition disabled:opacity-50",
-        TYPE_COLOR[type]
-      )}
-    >
-      {busy ? (
-        <Loader2 className="w-4 h-4 animate-spin" />
-      ) : (
-        <span className="text-xl leading-none">{DIAPER_TYPE_EMOJI[type]}</span>
-      )}
-      <span>{DIAPER_TYPE_LABEL[type]}</span>
-    </button>
-  );
-}
-
-// ─── Desktop Layout ───────────────────────────────────────────────────────
-function DesktopLayout({
-  header,
-  stats,
-  search,
-  summaries,
-  allEntries,
-  onLog,
-  onUndo,
-  busyType,
-}: {
-  header: React.ReactNode;
-  stats: React.ReactNode;
-  search: React.ReactNode;
-  summaries: ChildSummary[];
-  allEntries: DiaperEntry[];
-  onLog: (
-    child: RosterChild,
-    type: DiaperType,
-    closeSheet?: boolean
-  ) => Promise<void>;
-  onUndo: (child: RosterChild) => Promise<void>;
-  busyType: DiaperType | null;
-}) {
-  const sortedEntries = useMemo(
-    () =>
-      [...allEntries].sort((a, b) =>
-        a.recordedAt < b.recordedAt ? 1 : -1
-      ),
-    [allEntries]
-  );
-
-  return (
-    <div className="px-6 lg:px-10 py-6 max-w-7xl mx-auto animate-fade-in">
-      <div className="mb-6">{header}</div>
-
-      <div className="grid grid-cols-3 gap-4 mb-6">
-        <div className="col-span-2">{stats}</div>
-        <div>{search}</div>
-      </div>
-
-      <div className="grid grid-cols-3 gap-6">
-        <div className="col-span-2">
-          {summaries.length === 0 ? (
-            <Card>
-              <CardContent className="p-8 text-center text-sm text-muted-foreground">
-                No children match.
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="grid grid-cols-2 xl:grid-cols-3 gap-3">
-              {summaries.map((s) => (
-                <DesktopChildCard
-                  key={s.child.id}
-                  summary={s}
-                  busyType={busyType}
-                  onLog={(t) => onLog(s.child, t, false)}
-                  onUndo={() => onUndo(s.child)}
+          <div>
+            <FieldLabel emoji="⚡">Quick log</FieldLabel>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+                gap: 10,
+              }}
+            >
+              {DIAPER_TYPES.map((t) => (
+                <QuickTile
+                  key={t}
+                  type={t}
+                  busy={busyType === t}
+                  onClick={() => onLog(t)}
                 />
               ))}
             </div>
-          )}
-        </div>
+          </div>
 
-        <aside className="space-y-2">
-          <h2 className="text-sm font-bold text-edu-navy mb-2">
-            Today's Timeline
-          </h2>
-          {sortedEntries.length === 0 ? (
-            <Card>
-              <CardContent className="p-4 text-center text-xs text-muted-foreground">
-                No entries yet.
-              </CardContent>
-            </Card>
-          ) : (
-            <ol className="space-y-1.5 max-h-[70vh] overflow-y-auto pr-1">
-              {sortedEntries.map((e) => (
-                <li key={e.id}>
-                  <Card>
-                    <CardContent className="p-2.5 flex items-center gap-2">
-                      <span className="text-lg">
-                        {DIAPER_TYPE_EMOJI[e.type]}
-                      </span>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs font-bold text-edu-navy truncate">
-                          {e.studentName}
-                        </p>
-                        <p className="text-[10px] text-muted-foreground">
-                          {DIAPER_TYPE_LABEL[e.type]} · {e.time}
-                        </p>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </li>
-              ))}
-            </ol>
-          )}
-        </aside>
+          <div>
+            <FieldLabel emoji="📝">Note (optional)</FieldLabel>
+            <textarea
+              value={note}
+              onChange={(e) => onNoteChange(e.target.value)}
+              placeholder="Anything to flag for parent? (rash, leakage, discomfort)"
+              rows={2}
+              style={{
+                width: "100%",
+                padding: "12px 14px",
+                borderRadius: 16,
+                background: "#fff",
+                border: "none",
+                fontSize: 12,
+                fontWeight: 500,
+                color: "#0F172A",
+                outline: "none",
+                resize: "none",
+                boxShadow: PILLOW,
+                fontFamily: "inherit",
+                lineHeight: 1.55,
+              }}
+            />
+          </div>
+        </div>
       </div>
     </div>
   );
 }
 
-function DesktopChildCard({
-  summary,
-  busyType,
-  onLog,
-  onUndo,
+function FieldLabel({
+  emoji,
+  children,
 }: {
-  summary: ChildSummary;
-  busyType: DiaperType | null;
-  onLog: (type: DiaperType) => void;
-  onUndo: () => void;
+  emoji?: string;
+  children: React.ReactNode;
 }) {
-  const { child, lastEntry, todayCount, minsSince } = summary;
-  const overdue = minsSince === null ? false : minsSince > 180;
-
-  return (
-    <Card
-      className={cn(
-        "border transition",
-        overdue && "border-edu-orange/60 bg-edu-light-orange/30"
-      )}
-    >
-      <CardContent className="p-3 space-y-3">
-        <div className="flex items-center gap-3">
-          <Avatar name={child.name} photoURL={child.photoURL} />
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-bold text-edu-navy truncate">
-              {child.name}
-            </p>
-            <p className="text-[11px] text-muted-foreground truncate">
-              {lastEntry
-                ? `${DIAPER_TYPE_EMOJI[lastEntry.type]} ${sinceLabel(minsSince ?? 0)} · ${todayCount}x today`
-                : "Not logged yet"}
-            </p>
-          </div>
-          {lastEntry && (
-            <button
-              type="button"
-              onClick={onUndo}
-              title="Undo last entry"
-              className="text-muted-foreground hover:text-edu-red w-7 h-7 rounded-lg hover:bg-edu-light-red/40 flex items-center justify-center"
-            >
-              <Undo2 className="w-3.5 h-3.5" />
-            </button>
-          )}
-        </div>
-        <div className="grid grid-cols-5 gap-1.5">
-          {DIAPER_TYPES.map((t) => (
-            <button
-              key={t}
-              type="button"
-              disabled={busyType !== null}
-              onClick={() => onLog(t)}
-              title={DIAPER_TYPE_LABEL[t]}
-              className={cn(
-                "h-10 rounded-lg border-2 flex items-center justify-center text-base font-bold transition active:scale-95 disabled:opacity-50",
-                TYPE_COLOR[t]
-              )}
-            >
-              {busyType === t ? (
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-              ) : (
-                DIAPER_TYPE_EMOJI[t]
-              )}
-            </button>
-          ))}
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-// ─── Shared ──────────────────────────────────────────────────────────────
-function Avatar({
-  name,
-  photoURL,
-  size = "md",
-}: {
-  name: string;
-  photoURL?: string;
-  size?: "md" | "lg";
-}) {
-  const initials = name
-    .split(/\s+/)
-    .map((w) => w[0])
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
-  const dim = size === "lg" ? "w-12 h-12" : "w-10 h-10";
-  if (photoURL) {
-    return (
-      <img
-        src={photoURL}
-        alt={name}
-        className={cn(dim, "rounded-xl object-cover")}
-      />
-    );
-  }
   return (
     <div
-      className={cn(
-        dim,
-        "rounded-xl bg-edu-light-blue text-edu-blue flex items-center justify-center font-black text-sm"
-      )}
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 6,
+        marginBottom: 8,
+      }}
     >
-      {initials}
+      {emoji && (
+        <span
+          aria-hidden
+          style={{
+            fontSize: 13,
+            transform: "rotate(-6deg)",
+            display: "inline-block",
+          }}
+        >
+          {emoji}
+        </span>
+      )}
+      <p
+        style={{
+          fontSize: 10,
+          fontWeight: 800,
+          letterSpacing: "0.14em",
+          textTransform: "uppercase",
+          color: NAVY,
+          opacity: 0.75,
+        }}
+      >
+        {children}
+      </p>
     </div>
   );
 }
+
+function DotScribbles({
+  color,
+  dense = false,
+}: {
+  color: string;
+  dense?: boolean;
+}) {
+  return (
+    <svg
+      aria-hidden="true"
+      width="100%"
+      height="100%"
+      style={{
+        position: "absolute",
+        inset: 0,
+        opacity: dense ? 0.1 : 0.07,
+        pointerEvents: "none",
+      }}
+    >
+      <circle cx="14%" cy="24%" r="2.5" fill={color} />
+      <circle cx="82%" cy="14%" r="1.8" fill={color} />
+      <circle cx="68%" cy="62%" r="2" fill={color} />
+      <circle cx="22%" cy="80%" r="1.6" fill={color} />
+      <circle cx="48%" cy="32%" r="1.4" fill={color} />
+      {dense && (
+        <>
+          <circle cx="90%" cy="80%" r="2.2" fill={color} />
+          <circle cx="6%" cy="60%" r="1.4" fill={color} />
+          <circle cx="55%" cy="88%" r="1.6" fill={color} />
+        </>
+      )}
+    </svg>
+  );
+}
+
+// Palette constants reserved for future variants on this page.
+void BLUSH;
+void LAV;
