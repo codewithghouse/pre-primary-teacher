@@ -1,6 +1,4 @@
-import { useState } from "react";
-import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { useEffect, useState } from "react";
 import {
   Camera,
   Mic,
@@ -8,49 +6,109 @@ import {
   CheckCircle2,
   Cloud,
   Send,
-  Sparkles,
   Loader2,
+  X,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { format } from "date-fns";
 import { useTeacherClass } from "@/hooks/useTeacherClass";
+import { useIsDesktop } from "@/hooks/useIsDesktop";
 import {
   usePPDailyActivities,
   type DailySlot,
 } from "@/hooks/usePPDailyActivities";
+
+/* ═══════════════════════════════════════════════════════════════════════
+   PRE-PRIMARY TEACHER · DAILY ACTIVITIES
+   Storybook-sherbet slot timeline + parent-report publisher.
+   Status-keyed sherbet surface, animated progress, mint publish CTA.
+   ════════════════════════════════════════════════════════════════════════ */
+
+const NAVY = "#1e3272";
+const MINT = "#10B981";
+const PEACH = "#FB923C";
+const BLUSH = "#EC4899";
+const SKY = "#0EA5E9";
+const LAV = "#A78BFA";
+const BUTTER = "#F59E0B";
+const RED = "#EF4444";
+
+const PILLOW =
+  "0 1px 0 rgba(255,255,255,0.55) inset, 0 14px 32px -10px rgba(30,50,114,0.16), 0 4px 10px rgba(30,50,114,0.06)";
+
+type SlotStatus = DailySlot["status"];
+
+const STATUS_TONE: Record<
+  SlotStatus,
+  { tone: string; surface: string; emoji: string; label: string }
+> = {
+  done: {
+    tone: MINT,
+    surface: "linear-gradient(135deg, #D6F5E2 0%, #F1FBF5 100%)",
+    emoji: "✅",
+    label: "Done",
+  },
+  in_progress: {
+    tone: BUTTER,
+    surface: "linear-gradient(135deg, #FFEBC8 0%, #FFF7E5 100%)",
+    emoji: "⏳",
+    label: "In progress",
+  },
+  pending: {
+    tone: SKY,
+    surface: "linear-gradient(135deg, #F8FAFC 0%, #FFFFFF 100%)",
+    emoji: "⌛",
+    label: "Pending",
+  },
+  skipped: {
+    tone: "#94A3B8",
+    surface: "linear-gradient(135deg, #F1F5F9 0%, #FFFFFF 100%)",
+    emoji: "☁️",
+    label: "Skipped",
+  },
+};
 
 export default function DailyActivities() {
   const { primaryClass, loading: classLoading } = useTeacherClass();
   const { data, loading, updateSlot, publishReport } = usePPDailyActivities(
     primaryClass?.id
   );
+  const isDesktop = useIsDesktop();
   const [editingSlotId, setEditingSlotId] = useState<string | null>(null);
   const [draftNote, setDraftNote] = useState("");
   const [saving, setSaving] = useState(false);
 
-  if (classLoading || loading) {
-    return (
-      <div className="px-4 py-12 flex flex-col items-center text-muted-foreground gap-3">
-        <Loader2 className="w-6 h-6 animate-spin" />
-        <p className="text-xs">Loading today's activities…</p>
-      </div>
-    );
-  }
+  useEffect(() => {
+    if (!editingSlotId) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [editingSlotId]);
+
+  if (classLoading || loading) return <CenteredLoader label="Loading today's activities…" />;
 
   if (!primaryClass || !data) {
     return (
-      <div className="px-4 py-12 text-center">
-        <p className="text-sm font-bold text-edu-navy">No class assigned</p>
+      <div style={{ padding: "48px 16px", textAlign: "center" }}>
+        <p style={{ fontSize: 16, fontWeight: 800, color: NAVY }}>
+          🌱 No class assigned
+        </p>
       </div>
     );
   }
 
   const slots = data.slots;
+  const total = slots.length || 1;
   const completed = slots.filter((s) => s.status === "done").length;
+  const pending = slots.filter((s) => s.status === "pending").length;
+  const skipped = slots.filter((s) => s.status === "skipped").length;
   const totalPhotos = slots.reduce(
     (acc, s) => acc + (s.photoURLs?.length || 0),
     0
   );
+  const progressPct = (completed / total) * 100;
   const reportPublished =
     data.reportStatus === "published" || data.reportStatus === "auto_published";
 
@@ -70,7 +128,7 @@ export default function DailyActivities() {
       });
       setEditingSlotId(null);
       setDraftNote("");
-      toast.success("Slot completed");
+      toast.success("Slot completed ✓");
     } catch (err) {
       console.error("[DailyActivities] save slot failed:", err);
       toast.error("Could not save. Check permissions & try again.");
@@ -108,251 +166,1182 @@ export default function DailyActivities() {
   const editing = editingSlotId ? slots.find((s) => s.id === editingSlotId) : null;
 
   return (
-    <div className="px-4 py-4 space-y-4 animate-fade-in pb-4">
-      <div>
-        <h1 className="text-xl font-black text-edu-navy">Daily Activities</h1>
-        <p className="text-xs text-muted-foreground mt-0.5">
-          {primaryClass.name} · Tap any slot to log + add a photo.
-        </p>
-      </div>
-
-      <Card className="bg-gradient-to-br from-edu-blue to-edu-navy text-white border-0">
-        <CardContent className="p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-[10px] uppercase tracking-widest text-white/70 font-bold">
-                Today's Progress
-              </p>
-              <p className="text-2xl font-black mt-0.5">
-                {completed}/{slots.length}{" "}
-                <span className="text-sm font-bold text-white/80">slots done</span>
-              </p>
-              <p className="text-[11px] text-white/70 mt-0.5">
-                {totalPhotos} photos · ready for parent report
-              </p>
-            </div>
-            <div className="w-14 h-14 rounded-2xl bg-white/10 flex items-center justify-center">
-              <Sparkles className="w-7 h-7 text-edu-yellow" />
-            </div>
-          </div>
-          <div className="mt-3 h-2 bg-white/15 rounded-full overflow-hidden">
-            <div
-              className="h-full bg-edu-yellow transition-all duration-500"
-              style={{ width: `${(completed / slots.length) * 100}%` }}
-            />
-          </div>
-        </CardContent>
-      </Card>
-
-      <ol className="relative space-y-2">
-        <div className="absolute left-[18px] top-2 bottom-2 w-0.5 bg-border" aria-hidden />
-        {slots.map((slot) => (
-          <li key={slot.id} className="relative pl-10">
-            <span
-              className={cn(
-                "absolute left-0 top-2 w-9 h-9 rounded-full border-2 flex items-center justify-center bg-white z-10",
-                slot.status === "done" && "border-edu-green",
-                slot.status === "in_progress" && "border-edu-yellow",
-                slot.status === "pending" && "border-border",
-                slot.status === "skipped" && "border-border opacity-50"
-              )}
-            >
-              {slot.status === "done" && <CheckCircle2 className="w-5 h-5 text-edu-green" />}
-              {slot.status === "in_progress" && (
-                <div className="w-2.5 h-2.5 bg-edu-yellow rounded-full animate-pulse" />
-              )}
-              {slot.status === "pending" && (
-                <div className="w-2 h-2 bg-border rounded-full" />
-              )}
-              {slot.status === "skipped" && (
-                <Cloud className="w-4 h-4 text-muted-foreground" />
-              )}
-            </span>
-            <SlotCard
-              slot={slot}
-              onTap={() => slot.status !== "skipped" && startEdit(slot)}
-            />
-          </li>
-        ))}
-      </ol>
-
-      <Card
-        className={cn(
-          "border-2",
-          reportPublished
-            ? "border-edu-green bg-edu-light-green/30"
-            : completed >= 3
-            ? "border-edu-yellow bg-edu-light-yellow/40"
-            : "border-border bg-secondary/30"
-        )}
+    <>
+      <div
+        className="animate-fade-in"
+        style={{
+          padding: isDesktop ? "24px 28px 80px" : "16px 16px 80px",
+          display: "flex",
+          flexDirection: "column",
+          gap: 16,
+          width: "100%",
+        }}
       >
-        <CardContent className="p-4">
-          {reportPublished ? (
-            <div className="flex items-center gap-3 text-edu-green">
-              <CheckCircle2 className="w-6 h-6" />
-              <div>
-                <p className="text-sm font-bold">Report published 🎉</p>
-                <p className="text-xs text-foreground/70">
-                  Parents will receive a push notification.
-                </p>
-              </div>
-            </div>
-          ) : (
-            <>
-              <p className="text-sm font-bold text-edu-navy">Today's Parent Report</p>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                Compiles {completed} completed slots + {totalPhotos} photos into a
-                push for parents. (Cloud Function publishes a PDF asynchronously.)
-              </p>
-              <Button
-                onClick={handlePublish}
-                className="w-full mt-3"
-                disabled={completed < 3 || saving}
-              >
-                {saving ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <Send className="w-4 h-4" />
-                )}
-                {completed < 3
-                  ? `Need at least 3 slots done (${completed}/3)`
-                  : "Publish to parents"}
-              </Button>
-            </>
-          )}
-        </CardContent>
-      </Card>
-
-      {editing && (
+        {/* Hero */}
         <div
-          className="fixed inset-0 z-50 bg-black/40 flex items-end animate-fade-in"
-          onClick={() => !saving && setEditingSlotId(null)}
+          style={{
+            position: "relative",
+            overflow: "hidden",
+            borderRadius: 28,
+            padding: isDesktop ? "22px 26px" : "18px 18px",
+            background:
+              "linear-gradient(135deg, #DCEEFF 0%, #F5FAFF 55%, #FFFFFF 100%)",
+            boxShadow: PILLOW,
+          }}
         >
+          <DotScribbles color={SKY} dense />
           <div
-            className="w-full max-w-md mx-auto bg-white rounded-t-3xl p-5 max-h-[85vh] overflow-y-auto animate-slide-up"
-            onClick={(e) => e.stopPropagation()}
+            style={{
+              position: "relative",
+              zIndex: 1,
+              display: "flex",
+              alignItems: "center",
+              gap: 14,
+              flexWrap: "wrap",
+            }}
           >
-            <div className="w-12 h-1.5 bg-border rounded-full mx-auto mb-3" />
-            <h3 className="text-base font-black text-edu-navy">{editing.title}</h3>
-            <p className="text-[11px] text-muted-foreground mb-4">
-              Planned {editing.plannedStart}
-            </p>
-
-            <div className="space-y-3">
-              <div>
-                <label className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground">
-                  Note
-                </label>
-                <div className="relative mt-1">
-                  <textarea
-                    value={draftNote}
-                    onChange={(e) => setDraftNote(e.target.value)}
-                    rows={3}
-                    placeholder="What happened in this slot?"
-                    className="w-full rounded-xl border border-input p-3 pr-12 text-sm focus:outline-none focus:ring-2 focus:ring-edu-navy resize-none"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => toast.message("Voice input — Phase 3")}
-                    className="absolute right-2 bottom-2 w-9 h-9 rounded-full bg-edu-green text-white flex items-center justify-center"
-                    title="Voice note (Phase 3)"
-                  >
-                    <Mic className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  className="flex-1"
-                  onClick={() => toast.message("Photo capture — Phase 3")}
+            <span
+              style={{
+                width: 52,
+                height: 52,
+                borderRadius: 18,
+                background: `linear-gradient(135deg, ${SKY}, #0284C7)`,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: 26,
+                boxShadow: `0 8px 18px ${SKY}55`,
+                transform: "rotate(-8deg)",
+                flexShrink: 0,
+              }}
+              aria-hidden
+            >
+              🎨
+            </span>
+            <div style={{ flex: 1, minWidth: 200 }}>
+              <p
+                style={{
+                  fontSize: 11,
+                  fontWeight: 800,
+                  letterSpacing: "0.16em",
+                  textTransform: "uppercase",
+                  color: SKY,
+                  opacity: 0.9,
+                }}
+              >
+                Today's flow
+              </p>
+              <h1
+                style={{
+                  fontSize: isDesktop ? 26 : 21,
+                  fontWeight: 800,
+                  letterSpacing: "-0.6px",
+                  color: NAVY,
+                  marginTop: 2,
+                }}
+              >
+                Daily Activities{" "}
+                <span
+                  aria-hidden
+                  style={{ display: "inline-block", transform: "rotate(6deg)" }}
                 >
-                  <Camera className="w-4 h-4" />
-                  Photo
-                </Button>
-                <Button
-                  variant="outline"
-                  className="flex-1"
-                  onClick={() => toast.message("Highlight — Phase 3")}
-                >
-                  <Star className="w-4 h-4" />
-                  Highlight
-                </Button>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2 pt-2">
-                <Button variant="success" onClick={saveSlot} disabled={saving}>
-                  {saving ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <CheckCircle2 className="w-4 h-4" />
-                  )}
-                  Mark Done
-                </Button>
-                <Button
-                  variant="ghost"
-                  disabled={saving}
-                  onClick={() => {
-                    const reason = prompt("Skip reason (e.g., 'rain', 'substitute')");
-                    if (reason !== null) {
-                      skipSlot(editing.id, reason || "skipped");
-                      setEditingSlotId(null);
-                    }
-                  }}
-                >
-                  Skip slot
-                </Button>
-              </div>
+                  ✨
+                </span>
+              </h1>
+              <p
+                style={{
+                  fontSize: isDesktop ? 13 : 12,
+                  fontWeight: 500,
+                  color: "#64748B",
+                  marginTop: 4,
+                }}
+              >
+                {primaryClass.name} · {format(new Date(), "EEEE, d MMM")} · Tap
+                any slot to log + add a photo
+              </p>
             </div>
           </div>
         </div>
+
+        {/* Progress hero card */}
+        <div
+          style={{
+            position: "relative",
+            overflow: "hidden",
+            borderRadius: 22,
+            padding: 18,
+            background:
+              "linear-gradient(135deg, #D6F5E2 0%, #F1FBF5 55%, #FFFFFF 100%)",
+            boxShadow: PILLOW,
+          }}
+        >
+          <DotScribbles color={MINT} dense />
+          <div
+            style={{
+              position: "relative",
+              zIndex: 1,
+              display: "flex",
+              alignItems: "flex-start",
+              justifyContent: "space-between",
+              gap: 12,
+              flexWrap: "wrap",
+            }}
+          >
+            <div>
+              <p
+                style={{
+                  fontSize: 10,
+                  fontWeight: 800,
+                  letterSpacing: "0.14em",
+                  textTransform: "uppercase",
+                  color: MINT,
+                  opacity: 0.85,
+                }}
+              >
+                Today's progress
+              </p>
+              <p
+                style={{
+                  fontSize: 30,
+                  fontWeight: 900,
+                  letterSpacing: "-1px",
+                  color: NAVY,
+                  marginTop: 4,
+                  lineHeight: 1,
+                }}
+              >
+                {completed}/{slots.length}{" "}
+                <span style={{ fontSize: 14, fontWeight: 700, color: "#64748B" }}>
+                  slots done
+                </span>
+              </p>
+              <p
+                style={{
+                  fontSize: 12,
+                  fontWeight: 600,
+                  color: "#64748B",
+                  marginTop: 4,
+                }}
+              >
+                📸 {totalPhotos} {totalPhotos === 1 ? "photo" : "photos"} captured today
+              </p>
+            </div>
+            <span
+              aria-hidden
+              style={{
+                width: 56,
+                height: 56,
+                borderRadius: 18,
+                background: `linear-gradient(135deg, ${BUTTER}, ${PEACH})`,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: 28,
+                boxShadow: `0 10px 22px ${BUTTER}55`,
+                transform: "rotate(-8deg)",
+                flexShrink: 0,
+              }}
+            >
+              ✨
+            </span>
+          </div>
+          {/* Progress bar */}
+          <div
+            style={{
+              position: "relative",
+              zIndex: 1,
+              marginTop: 14,
+              height: 12,
+              borderRadius: 999,
+              background: "rgba(15,23,42,0.06)",
+              overflow: "hidden",
+              boxShadow: "inset 0 1px 2px rgba(15,23,42,0.08)",
+            }}
+          >
+            <div
+              style={{
+                height: "100%",
+                width: `${progressPct}%`,
+                background: `linear-gradient(90deg, ${MINT}, #059669)`,
+                borderRadius: 999,
+                transition: "width 500ms cubic-bezier(.34,1.56,.64,1)",
+                boxShadow: `0 0 12px ${MINT}66`,
+              }}
+            />
+          </div>
+        </div>
+
+        {/* 4-stat strip */}
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+            gap: 10,
+          }}
+        >
+          <CounterCard
+            label="Done"
+            value={completed}
+            emoji="✅"
+            tone={MINT}
+            surface="linear-gradient(135deg, #D6F5E2 0%, #F1FBF5 100%)"
+          />
+          <CounterCard
+            label="Pending"
+            value={pending}
+            emoji="⌛"
+            tone={pending > 0 ? SKY : "#94A3B8"}
+            surface={
+              pending > 0
+                ? "linear-gradient(135deg, #DCEEFF 0%, #F5FAFF 100%)"
+                : "linear-gradient(135deg, #F1F5F9 0%, #FFFFFF 100%)"
+            }
+          />
+          <CounterCard
+            label="Skipped"
+            value={skipped}
+            emoji="☁️"
+            tone={skipped > 0 ? "#94A3B8" : MINT}
+            surface={
+              skipped > 0
+                ? "linear-gradient(135deg, #F1F5F9 0%, #FFFFFF 100%)"
+                : "linear-gradient(135deg, #D6F5E2 0%, #F1FBF5 100%)"
+            }
+          />
+          <CounterCard
+            label="Photos"
+            value={totalPhotos}
+            emoji="📸"
+            tone={totalPhotos > 0 ? BLUSH : "#94A3B8"}
+            surface={
+              totalPhotos > 0
+                ? "linear-gradient(135deg, #FFE0EC 0%, #FFF4F8 100%)"
+                : "linear-gradient(135deg, #F1F5F9 0%, #FFFFFF 100%)"
+            }
+          />
+        </div>
+
+        {/* Slot timeline */}
+        <ol
+          style={{
+            position: "relative",
+            display: "flex",
+            flexDirection: "column",
+            gap: 10,
+            padding: 0,
+            margin: 0,
+            listStyle: "none",
+          }}
+        >
+          {/* Vertical line */}
+          <div
+            aria-hidden
+            style={{
+              position: "absolute",
+              left: 22,
+              top: 14,
+              bottom: 14,
+              width: 2,
+              background:
+                "linear-gradient(to bottom, rgba(15,23,42,0.10) 0%, rgba(15,23,42,0.04) 100%)",
+              borderRadius: 999,
+              pointerEvents: "none",
+            }}
+          />
+          {slots.map((slot) => (
+            <li
+              key={slot.id}
+              style={{ position: "relative", paddingLeft: 56 }}
+            >
+              {/* Status node */}
+              <StatusNode status={slot.status} />
+              <SlotCard
+                slot={slot}
+                onTap={() => slot.status !== "skipped" && startEdit(slot)}
+                isDesktop={isDesktop}
+              />
+            </li>
+          ))}
+        </ol>
+
+        {/* Publish report */}
+        <div
+          style={{
+            position: "relative",
+            overflow: "hidden",
+            borderRadius: 22,
+            padding: 16,
+            background: reportPublished
+              ? "linear-gradient(135deg, #D6F5E2 0%, #F1FBF5 100%)"
+              : completed >= 3
+              ? "linear-gradient(135deg, #FFEBC8 0%, #FFF7E5 100%)"
+              : "linear-gradient(135deg, #F8FAFC 0%, #FFFFFF 100%)",
+            boxShadow: PILLOW,
+          }}
+        >
+          <DotScribbles
+            color={reportPublished ? MINT : completed >= 3 ? BUTTER : "#94A3B8"}
+          />
+          <div style={{ position: "relative", zIndex: 1 }}>
+            {reportPublished ? (
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <span
+                  style={{
+                    width: 44,
+                    height: 44,
+                    borderRadius: 14,
+                    background: `linear-gradient(135deg, ${MINT}, #059669)`,
+                    color: "#fff",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    boxShadow: `0 8px 18px ${MINT}55`,
+                    transform: "rotate(-6deg)",
+                    flexShrink: 0,
+                  }}
+                  aria-hidden
+                >
+                  <CheckCircle2 size={22} strokeWidth={2.4} />
+                </span>
+                <div>
+                  <p style={{ fontSize: 14, fontWeight: 800, color: "#047857" }}>
+                    Report published 🎉
+                  </p>
+                  <p style={{ fontSize: 12, color: "#64748B", marginTop: 2 }}>
+                    Parents will receive a push notification.
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <>
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    marginBottom: 6,
+                  }}
+                >
+                  <span
+                    aria-hidden
+                    style={{
+                      fontSize: 14,
+                      transform: "rotate(-6deg)",
+                      display: "inline-block",
+                    }}
+                  >
+                    📨
+                  </span>
+                  <p
+                    style={{
+                      fontSize: 10,
+                      fontWeight: 800,
+                      letterSpacing: "0.14em",
+                      textTransform: "uppercase",
+                      color: completed >= 3 ? BUTTER : "#94A3B8",
+                    }}
+                  >
+                    Today's Parent Report
+                  </p>
+                </div>
+                <p style={{ fontSize: 13, fontWeight: 800, color: NAVY }}>
+                  {completed} completed slot{completed === 1 ? "" : "s"} +{" "}
+                  {totalPhotos} photo{totalPhotos === 1 ? "" : "s"} ready to ship
+                </p>
+                <p
+                  style={{
+                    fontSize: 11,
+                    color: "#64748B",
+                    marginTop: 4,
+                    lineHeight: 1.5,
+                  }}
+                >
+                  Cloud Function publishes a PDF asynchronously. Parents get a
+                  push immediately.
+                </p>
+                <button
+                  type="button"
+                  onClick={handlePublish}
+                  disabled={completed < 3 || saving}
+                  style={{
+                    width: "100%",
+                    marginTop: 12,
+                    padding: "12px 16px",
+                    borderRadius: 16,
+                    background:
+                      completed < 3 || saving
+                        ? "#CBD5E1"
+                        : `linear-gradient(135deg, ${MINT}, #059669)`,
+                    color: "#fff",
+                    fontSize: 13,
+                    fontWeight: 800,
+                    letterSpacing: "-0.1px",
+                    border: "none",
+                    cursor: completed < 3 || saving ? "default" : "pointer",
+                    boxShadow:
+                      completed < 3 || saving
+                        ? "none"
+                        : `0 10px 24px -6px ${MINT}88`,
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 8,
+                  }}
+                  className="active:scale-95 hover:-translate-y-0.5 transition"
+                >
+                  {saving ? (
+                    <Loader2 size={14} className="animate-spin" />
+                  ) : (
+                    <Send size={14} strokeWidth={2.4} />
+                  )}
+                  {completed < 3
+                    ? `Need at least 3 slots done (${completed}/3)`
+                    : "Publish to parents"}
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {editing && (
+        <EditSheet
+          slot={editing}
+          draftNote={draftNote}
+          setDraftNote={setDraftNote}
+          saving={saving}
+          onClose={() => !saving && setEditingSlotId(null)}
+          onSave={saveSlot}
+          onSkip={(reason) => {
+            skipSlot(editing.id, reason);
+            setEditingSlotId(null);
+          }}
+        />
       )}
+    </>
+  );
+}
+
+/* ═══════════════════════ building blocks ═══════════════════════ */
+
+function CenteredLoader({ label }: { label: string }) {
+  return (
+    <div
+      style={{
+        padding: "48px 16px",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        gap: 12,
+        color: "#64748B",
+      }}
+    >
+      <Loader2 className="animate-spin" />
+      <p style={{ fontSize: 12, fontWeight: 600 }}>{label}</p>
     </div>
   );
 }
 
-function SlotCard({ slot, onTap }: { slot: DailySlot; onTap: () => void }) {
+function CounterCard({
+  label,
+  value,
+  emoji,
+  tone,
+  surface,
+}: {
+  label: string;
+  value: number;
+  emoji: string;
+  tone: string;
+  surface: string;
+}) {
+  return (
+    <div
+      style={{
+        position: "relative",
+        overflow: "hidden",
+        borderRadius: 22,
+        padding: "12px 12px 10px",
+        background: surface,
+        boxShadow: PILLOW,
+      }}
+    >
+      <DotScribbles color={tone} />
+      <div
+        style={{
+          display: "flex",
+          alignItems: "baseline",
+          justifyContent: "space-between",
+          position: "relative",
+          zIndex: 1,
+        }}
+      >
+        <span
+          style={{
+            fontSize: 28,
+            fontWeight: 900,
+            letterSpacing: "-1.2px",
+            color: tone,
+            lineHeight: 1,
+          }}
+        >
+          {value}
+        </span>
+        <span
+          style={{
+            fontSize: 20,
+            lineHeight: 1,
+            transform: "rotate(8deg)",
+            filter: "drop-shadow(0 3px 6px rgba(0,0,0,0.08))",
+          }}
+          aria-hidden
+        >
+          {emoji}
+        </span>
+      </div>
+      <p
+        style={{
+          fontSize: 10,
+          fontWeight: 800,
+          letterSpacing: "0.12em",
+          textTransform: "uppercase",
+          color: tone,
+          opacity: 0.75,
+          marginTop: 6,
+          position: "relative",
+          zIndex: 1,
+        }}
+      >
+        {label}
+      </p>
+    </div>
+  );
+}
+
+function StatusNode({ status }: { status: SlotStatus }) {
+  const st = STATUS_TONE[status];
+  return (
+    <span
+      style={{
+        position: "absolute",
+        left: 0,
+        top: 14,
+        width: 44,
+        height: 44,
+        borderRadius: 999,
+        background:
+          status === "done"
+            ? `linear-gradient(135deg, ${MINT}, #059669)`
+            : status === "in_progress"
+            ? `linear-gradient(135deg, ${BUTTER}, ${PEACH})`
+            : "#fff",
+        boxShadow:
+          status === "done"
+            ? `0 8px 18px -4px ${MINT}66`
+            : status === "in_progress"
+            ? `0 8px 18px -4px ${BUTTER}66`
+            : `inset 0 0 0 2px ${st.tone}44, 0 4px 10px rgba(15,23,42,0.06)`,
+        color: status === "done" || status === "in_progress" ? "#fff" : st.tone,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        zIndex: 2,
+        transform:
+          status === "done" || status === "in_progress" ? "rotate(-6deg)" : "none",
+      }}
+      aria-hidden
+    >
+      {status === "done" && <CheckCircle2 size={20} strokeWidth={2.6} />}
+      {status === "in_progress" && (
+        <span
+          style={{
+            width: 10,
+            height: 10,
+            background: "#fff",
+            borderRadius: 999,
+            animation: "pulse 1.4s ease-in-out infinite",
+          }}
+        />
+      )}
+      {status === "pending" && (
+        <span
+          style={{
+            width: 8,
+            height: 8,
+            background: st.tone,
+            opacity: 0.6,
+            borderRadius: 999,
+          }}
+        />
+      )}
+      {status === "skipped" && <Cloud size={18} strokeWidth={2.4} />}
+    </span>
+  );
+}
+
+function SlotCard({
+  slot,
+  onTap,
+  isDesktop,
+}: {
+  slot: DailySlot;
+  onTap: () => void;
+  isDesktop: boolean;
+}) {
+  const st = STATUS_TONE[slot.status];
   const photos = slot.photoURLs?.length || 0;
+
   return (
     <button
       type="button"
       onClick={onTap}
-      className={cn(
-        "w-full text-left rounded-2xl border bg-white p-3 shadow-sm active:scale-[0.98] transition-all",
-        slot.status === "done" && "opacity-90",
-        slot.status === "in_progress" && "ring-2 ring-edu-yellow ring-offset-1",
-        slot.status === "skipped" && "opacity-60"
-      )}
+      style={{
+        width: "100%",
+        position: "relative",
+        overflow: "hidden",
+        borderRadius: 22,
+        padding: 14,
+        background: st.surface,
+        boxShadow: PILLOW,
+        borderLeft: `5px solid ${st.tone}`,
+        textAlign: "left",
+        border: "none",
+        cursor: slot.status === "skipped" ? "default" : "pointer",
+        opacity: slot.status === "skipped" ? 0.65 : 1,
+        transition: "transform 140ms ease",
+      }}
+      className={
+        slot.status === "skipped" ? "" : "active:scale-[0.99] hover:-translate-y-0.5"
+      }
     >
-      <div className="flex items-start justify-between gap-2">
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-bold text-foreground leading-tight">
-            {slot.title}
-          </p>
-          <p className="text-[11px] text-muted-foreground mt-0.5">{slot.plannedStart}</p>
+      <DotScribbles color={st.tone} />
+      <div style={{ position: "relative", zIndex: 1 }}>
+        {/* Header row */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "flex-start",
+            justifyContent: "space-between",
+            gap: 8,
+          }}
+        >
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <p
+              style={{
+                fontSize: isDesktop ? 15 : 14,
+                fontWeight: 800,
+                color: NAVY,
+                letterSpacing: "-0.2px",
+                lineHeight: 1.2,
+              }}
+            >
+              {slot.title}
+            </p>
+            <p
+              style={{
+                fontSize: 11,
+                fontWeight: 700,
+                color: "#64748B",
+                marginTop: 3,
+              }}
+            >
+              ⏰ {slot.plannedStart}
+            </p>
+          </div>
+          <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+            {photos > 0 && (
+              <span
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 4,
+                  fontSize: 10,
+                  fontWeight: 800,
+                  color: BLUSH,
+                  background: "#fff",
+                  padding: "3px 9px",
+                  borderRadius: 999,
+                  boxShadow: `inset 0 0 0 1px ${BLUSH}33`,
+                }}
+              >
+                <Camera size={11} strokeWidth={2.6} />
+                {photos}
+              </span>
+            )}
+            <span
+              style={{
+                fontSize: 9,
+                fontWeight: 900,
+                letterSpacing: "0.08em",
+                textTransform: "uppercase",
+                color: "#fff",
+                background: `linear-gradient(135deg, ${st.tone}, ${st.tone}cc)`,
+                padding: "3px 8px",
+                borderRadius: 999,
+                boxShadow: `0 3px 8px ${st.tone}44`,
+              }}
+            >
+              {st.emoji} {st.label}
+            </span>
+          </div>
         </div>
-        {photos > 0 && (
-          <div className="flex items-center gap-1 text-[10px] font-bold text-edu-blue bg-edu-light-blue px-2 py-1 rounded-full shrink-0">
-            <Camera className="w-3 h-3" />
-            {photos}
+
+        {/* Note */}
+        {slot.note && (
+          <p
+            style={{
+              fontSize: 12,
+              fontStyle: "italic",
+              color: "#0F172A",
+              opacity: 0.85,
+              lineHeight: 1.5,
+              marginTop: 8,
+            }}
+          >
+            "{slot.note}"
+          </p>
+        )}
+
+        {/* Highlighted kids */}
+        {slot.highlightedKids && slot.highlightedKids.length > 0 && (
+          <div
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 4,
+              fontSize: 11,
+              fontWeight: 800,
+              color: BUTTER,
+              background: "#fff",
+              padding: "4px 10px",
+              borderRadius: 999,
+              marginTop: 8,
+              boxShadow: `inset 0 0 0 1px ${BUTTER}55`,
+            }}
+          >
+            <Star size={11} strokeWidth={2.6} fill={BUTTER} />
+            {slot.highlightedKids.join(", ")}
           </div>
         )}
+
+        {/* Skip reason */}
+        {slot.skipReason && (
+          <p
+            style={{
+              fontSize: 11,
+              fontWeight: 600,
+              color: "#64748B",
+              marginTop: 6,
+              fontStyle: "italic",
+            }}
+          >
+            ☁️ Skipped: {slot.skipReason}
+          </p>
+        )}
       </div>
-      {slot.note && (
-        <p className="text-[11px] text-foreground/70 mt-1.5 line-clamp-2 italic">
-          "{slot.note}"
-        </p>
-      )}
-      {slot.highlightedKids && slot.highlightedKids.length > 0 && (
-        <div className="mt-2 flex items-center gap-1 text-[10px] text-edu-yellow font-bold">
-          <Star className="w-3 h-3 fill-edu-yellow" />
-          {slot.highlightedKids.join(", ")}
-        </div>
-      )}
-      {slot.skipReason && (
-        <p className="text-[10px] text-muted-foreground mt-1">Skipped: {slot.skipReason}</p>
-      )}
     </button>
   );
 }
+
+/* ═══════════════════════ Edit sheet ═══════════════════════ */
+
+function EditSheet({
+  slot,
+  draftNote,
+  setDraftNote,
+  saving,
+  onClose,
+  onSave,
+  onSkip,
+}: {
+  slot: DailySlot;
+  draftNote: string;
+  setDraftNote: (v: string) => void;
+  saving: boolean;
+  onClose: () => void;
+  onSave: () => void;
+  onSkip: (reason: string) => void;
+}) {
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 50,
+        background: "rgba(15,23,42,0.5)",
+        backdropFilter: "blur(4px)",
+        WebkitBackdropFilter: "blur(4px)",
+        display: "flex",
+        alignItems: "flex-end",
+        justifyContent: "center",
+        animation: "fade-in 200ms ease-out",
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          width: "100%",
+          maxWidth: 480,
+          maxHeight: "92vh",
+          overflowY: "auto",
+          background:
+            "linear-gradient(180deg, #F0F9FF 0%, #FFFFFF 28%, #FFFFFF 100%)",
+          borderRadius: "28px 28px 0 0",
+          boxShadow: "0 -20px 60px rgba(15,23,42,0.18)",
+          animation: "slide-up 240ms cubic-bezier(.34,1.56,.64,1)",
+          position: "relative",
+          paddingBottom: "env(safe-area-inset-bottom)",
+        }}
+      >
+        {/* Sticky header */}
+        <div
+          style={{
+            position: "sticky",
+            top: 0,
+            background:
+              "linear-gradient(180deg, rgba(240,249,255,0.95) 0%, rgba(255,255,255,0.85) 100%)",
+            backdropFilter: "blur(10px)",
+            WebkitBackdropFilter: "blur(10px)",
+            padding: "10px 18px 12px",
+            borderRadius: "28px 28px 0 0",
+            zIndex: 10,
+          }}
+        >
+          <div
+            style={{
+              width: 48,
+              height: 5,
+              borderRadius: 999,
+              background: "#E2E8F0",
+              margin: "0 auto 12px",
+            }}
+          />
+          <div
+            style={{
+              display: "flex",
+              alignItems: "flex-start",
+              justifyContent: "space-between",
+              gap: 12,
+            }}
+          >
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <p
+                style={{
+                  fontSize: 10,
+                  fontWeight: 800,
+                  letterSpacing: "0.16em",
+                  textTransform: "uppercase",
+                  color: SKY,
+                  opacity: 0.85,
+                }}
+              >
+                Slot · ⏰ {slot.plannedStart}
+              </p>
+              <h3
+                style={{
+                  fontSize: 18,
+                  fontWeight: 800,
+                  letterSpacing: "-0.3px",
+                  color: NAVY,
+                  marginTop: 2,
+                }}
+              >
+                {slot.title}{" "}
+                <span
+                  aria-hidden
+                  style={{
+                    display: "inline-block",
+                    transform: "rotate(-6deg)",
+                    fontSize: 15,
+                  }}
+                >
+                  🎨
+                </span>
+              </h3>
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close"
+              style={{
+                width: 34,
+                height: 34,
+                borderRadius: 999,
+                background: "#F1F5F9",
+                border: "none",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                cursor: "pointer",
+                flexShrink: 0,
+              }}
+            >
+              <X size={16} color="#64748B" strokeWidth={2.4} />
+            </button>
+          </div>
+        </div>
+
+        <div
+          style={{
+            padding: "12px 18px 24px",
+            display: "flex",
+            flexDirection: "column",
+            gap: 14,
+          }}
+        >
+          {/* Note */}
+          <div>
+            <FieldLabel emoji="📝">Note</FieldLabel>
+            <div style={{ position: "relative" }}>
+              <textarea
+                value={draftNote}
+                onChange={(e) => setDraftNote(e.target.value)}
+                rows={3}
+                placeholder="What happened in this slot?"
+                style={{
+                  width: "100%",
+                  padding: "12px 50px 12px 14px",
+                  borderRadius: 16,
+                  background: "#fff",
+                  border: "none",
+                  fontSize: 13,
+                  fontWeight: 500,
+                  color: "#0F172A",
+                  outline: "none",
+                  resize: "none",
+                  boxShadow: PILLOW,
+                  fontFamily: "inherit",
+                  lineHeight: 1.55,
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => toast.message("Voice input — coming in Phase 3")}
+                title="Voice note (Phase 3)"
+                style={{
+                  position: "absolute",
+                  right: 8,
+                  bottom: 8,
+                  width: 36,
+                  height: 36,
+                  borderRadius: 999,
+                  background: `linear-gradient(135deg, ${MINT}, #059669)`,
+                  color: "#fff",
+                  border: "none",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  cursor: "pointer",
+                  boxShadow: `0 6px 14px ${MINT}55`,
+                  transform: "rotate(-6deg)",
+                }}
+              >
+                <Mic size={15} strokeWidth={2.4} />
+              </button>
+            </div>
+          </div>
+
+          {/* Photo + Highlight placeholders */}
+          <div style={{ display: "flex", gap: 8 }}>
+            <SecondaryPillow
+              icon={<Camera size={14} strokeWidth={2.6} />}
+              label="Photo"
+              tone={BLUSH}
+              onClick={() => toast.message("Photo capture — coming in Phase 3")}
+            />
+            <SecondaryPillow
+              icon={<Star size={14} strokeWidth={2.6} />}
+              label="Highlight"
+              tone={BUTTER}
+              onClick={() => toast.message("Highlight — coming in Phase 3")}
+            />
+          </div>
+
+          {/* Save + Skip */}
+          <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 8 }}>
+            <button
+              type="button"
+              onClick={onSave}
+              disabled={saving}
+              style={{
+                padding: "12px 16px",
+                borderRadius: 16,
+                background: saving
+                  ? "#CBD5E1"
+                  : `linear-gradient(135deg, ${MINT}, #059669)`,
+                color: "#fff",
+                fontSize: 13,
+                fontWeight: 800,
+                border: "none",
+                cursor: saving ? "default" : "pointer",
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 6,
+                boxShadow: saving ? "none" : `0 10px 24px -6px ${MINT}88`,
+              }}
+              className="active:scale-95 hover:-translate-y-0.5 transition"
+            >
+              {saving ? (
+                <Loader2 size={14} className="animate-spin" />
+              ) : (
+                <CheckCircle2 size={14} strokeWidth={2.6} />
+              )}
+              Mark Done
+            </button>
+            <button
+              type="button"
+              disabled={saving}
+              onClick={() => {
+                const reason = prompt(
+                  "Skip reason (e.g., 'rain', 'substitute')"
+                );
+                if (reason !== null) {
+                  onSkip(reason || "skipped");
+                }
+              }}
+              style={{
+                padding: "12px 16px",
+                borderRadius: 16,
+                background: "#fff",
+                color: "#64748B",
+                fontSize: 12,
+                fontWeight: 800,
+                border: "none",
+                cursor: saving ? "default" : "pointer",
+                boxShadow: PILLOW,
+                opacity: saving ? 0.6 : 1,
+              }}
+              className="active:scale-95 hover:-translate-y-0.5 transition"
+            >
+              ☁️ Skip
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SecondaryPillow({
+  icon,
+  label,
+  tone,
+  onClick,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  tone: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      style={{
+        flex: 1,
+        padding: "10px 12px",
+        borderRadius: 14,
+        background: "#fff",
+        color: tone,
+        fontSize: 12,
+        fontWeight: 800,
+        border: "none",
+        cursor: "pointer",
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 5,
+        boxShadow: `inset 0 0 0 1px ${tone}55, 0 4px 10px ${tone}1f`,
+      }}
+      className="active:scale-95 hover:-translate-y-0.5 transition"
+    >
+      {icon}
+      {label}
+    </button>
+  );
+}
+
+function FieldLabel({
+  emoji,
+  children,
+}: {
+  emoji?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 6,
+        marginBottom: 8,
+      }}
+    >
+      {emoji && (
+        <span
+          aria-hidden
+          style={{
+            fontSize: 13,
+            transform: "rotate(-6deg)",
+            display: "inline-block",
+          }}
+        >
+          {emoji}
+        </span>
+      )}
+      <p
+        style={{
+          fontSize: 10,
+          fontWeight: 800,
+          letterSpacing: "0.14em",
+          textTransform: "uppercase",
+          color: NAVY,
+          opacity: 0.75,
+        }}
+      >
+        {children}
+      </p>
+    </div>
+  );
+}
+
+function DotScribbles({
+  color,
+  dense = false,
+}: {
+  color: string;
+  dense?: boolean;
+}) {
+  return (
+    <svg
+      aria-hidden="true"
+      width="100%"
+      height="100%"
+      style={{
+        position: "absolute",
+        inset: 0,
+        opacity: dense ? 0.1 : 0.07,
+        pointerEvents: "none",
+      }}
+    >
+      <circle cx="14%" cy="24%" r="2.5" fill={color} />
+      <circle cx="82%" cy="14%" r="1.8" fill={color} />
+      <circle cx="68%" cy="62%" r="2" fill={color} />
+      <circle cx="22%" cy="80%" r="1.6" fill={color} />
+      <circle cx="48%" cy="32%" r="1.4" fill={color} />
+      {dense && (
+        <>
+          <circle cx="90%" cy="80%" r="2.2" fill={color} />
+          <circle cx="6%" cy="60%" r="1.4" fill={color} />
+          <circle cx="55%" cy="88%" r="1.6" fill={color} />
+        </>
+      )}
+    </svg>
+  );
+}
+
+// Palette constants reserved for future variants.
+void LAV;
+void RED;

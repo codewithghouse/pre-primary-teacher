@@ -1,17 +1,10 @@
 /**
- * Photos.tsx — Pre-primary Photo Studio (teacher).
+ * Photos.tsx — Pre-primary Photo Studio (teacher). Cartoonified 2026-05-25.
  *
- * Teacher captures or uploads photos throughout the day. Each upload:
- *   1. Lets the teacher pick files (camera OR device gallery, multi-select)
- *   2. Opens a tag dialog — teacher selects which children are in the photo
- *      from the class roster
- *   3. Auto-attaches to the in-progress slot from Daily Activities (so the
- *      photo appears in that slot's photo strip)
- *   4. Streams to Firebase Storage with per-file progress
- *   5. Creates pp_photos Firestore docs that pre-parent-dashboard's Gallery
- *      subscribes to
- *
- * Distinct mobile + desktop layouts per project policy.
+ * Teacher captures or uploads photos. Each upload tags selected children
+ * from roster, optionally attaches to active slot, streams to Storage with
+ * per-file progress, and creates pp_photos docs the parent Gallery
+ * subscribes to.
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -22,21 +15,29 @@ import {
   CheckCircle2,
   Loader2,
   Trash2,
-  Sparkles,
-  Users,
   Tag,
   AlertTriangle,
 } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
-import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { cn } from "@/lib/utils";
 import { useTeacherClass } from "@/hooks/useTeacherClass";
 import { useClassRoster, type RosterChild } from "@/hooks/useClassRoster";
 import { usePPDailyActivities } from "@/hooks/usePPDailyActivities";
 import { usePPPhotos, type UploadProgress } from "@/hooks/usePPPhotos";
 import { useIsDesktop } from "@/hooks/useIsDesktop";
+import { CartoonAvatar } from "@/components/CartoonAvatar";
+
+const NAVY = "#1e3272";
+const MINT = "#10B981";
+const PEACH = "#FB923C";
+const BLUSH = "#EC4899";
+const SKY = "#0EA5E9";
+const LAV = "#A78BFA";
+const BUTTER = "#F59E0B";
+const RED = "#EF4444";
+
+const PILLOW =
+  "0 1px 0 rgba(255,255,255,0.55) inset, 0 14px 32px -10px rgba(30,50,114,0.16), 0 4px 10px rgba(30,50,114,0.06)";
 
 interface PreviewItem {
   file: File;
@@ -62,15 +63,11 @@ export default function Photos() {
   const [progress, setProgress] = useState<UploadProgress[]>([]);
   const [fullscreenPhoto, setFullscreenPhoto] = useState<string | null>(null);
 
-  // Auto-detect in-progress slot for slot-attach default.
   const activeSlot = useMemo(() => {
     const slots = activities?.slots || [];
     return slots.find((s) => s.status === "in_progress") || null;
   }, [activities]);
 
-  // Stats — MUST live above early returns or React throws
-  // "Rendered more hooks than during the previous render" when classLoading
-  // flips from true → false.
   const stats = useMemo(() => {
     const taggedCount = new Set(
       photos.flatMap((p) => p.taggedStudentIds)
@@ -82,7 +79,6 @@ export default function Photos() {
     };
   }, [photos, roster]);
 
-  // Revoke preview URLs on unmount / change
   useEffect(() => {
     return () => {
       previews.forEach((p) => URL.revokeObjectURL(p.url));
@@ -90,21 +86,12 @@ export default function Photos() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  if (classLoading) {
-    return (
-      <div className="px-4 py-12 flex flex-col items-center text-muted-foreground gap-3">
-        <Loader2 className="w-6 h-6 animate-spin" />
-        <p className="text-xs">Resolving your class…</p>
-      </div>
-    );
-  }
-
+  if (classLoading) return <CenteredLoader label="Resolving your class…" />;
   if (!primaryClass) {
     return (
-      <div className="px-4 py-12 text-center">
-        <p className="text-sm font-bold text-edu-navy">No class assigned</p>
-        <p className="text-xs text-muted-foreground mt-1">
-          Contact your principal to be added to a class.
+      <div style={{ padding: "48px 16px", textAlign: "center" }}>
+        <p style={{ fontSize: 16, fontWeight: 800, color: NAVY }}>
+          🌱 No class assigned
         </p>
       </div>
     );
@@ -182,7 +169,6 @@ export default function Photos() {
         toast.warning(`${ok} uploaded, ${failed} failed. Check console.`);
       }
 
-      // Reset state
       previews.forEach((p) => URL.revokeObjectURL(p.url));
       setPreviews([]);
       setTaggedIds(new Set());
@@ -198,7 +184,8 @@ export default function Photos() {
   };
 
   const handleDelete = async (photoId: string) => {
-    if (!window.confirm("Delete this photo? Parents will stop seeing it.")) return;
+    if (!window.confirm("Delete this photo? Parents will stop seeing it."))
+      return;
     try {
       const ph = photos.find((p) => p.id === photoId);
       if (!ph) return;
@@ -210,275 +197,470 @@ export default function Photos() {
     }
   };
 
+  const previewCols = isDesktop ? "repeat(6, minmax(0, 1fr))" : "repeat(3, minmax(0, 1fr))";
+  const photoCols = isDesktop ? "repeat(5, minmax(0, 1fr))" : "repeat(3, minmax(0, 1fr))";
+
   return (
     <div
-      className={cn(
-        "py-4 space-y-4 animate-fade-in",
-        isDesktop ? "px-6 lg:px-10 max-w-7xl mx-auto" : "px-4"
-      )}
+      className="animate-fade-in"
+      style={{
+        padding: isDesktop ? "24px 28px 80px" : "16px 16px 80px",
+        display: "flex",
+        flexDirection: "column",
+        gap: 16,
+        width: "100%",
+      }}
     >
-      {/* Header */}
-      <div className="flex items-center gap-2 pt-1">
+      {/* Hero */}
+      <div
+        style={{
+          position: "relative",
+          overflow: "hidden",
+          borderRadius: 28,
+          padding: isDesktop ? "22px 26px" : "18px 18px",
+          background:
+            "linear-gradient(135deg, #FFE0EC 0%, #FFF4F8 55%, #FFFFFF 100%)",
+          boxShadow: PILLOW,
+        }}
+      >
+        <DotScribbles color={BLUSH} dense />
         <div
-          className={cn(
-            "rounded-xl bg-edu-light-pink text-edu-pink flex items-center justify-center",
-            isDesktop ? "w-10 h-10" : "w-9 h-9"
-          )}
+          style={{
+            position: "relative",
+            zIndex: 1,
+            display: "flex",
+            alignItems: "center",
+            gap: 14,
+            flexWrap: "wrap",
+          }}
         >
-          <Camera className={isDesktop ? "w-5 h-5" : "w-4 h-4"} />
-        </div>
-        <div>
-          <h1
-            className={cn(
-              "font-black text-edu-navy leading-none",
-              isDesktop ? "text-2xl" : "text-xl"
-            )}
+          <span
+            style={{
+              width: 52,
+              height: 52,
+              borderRadius: 18,
+              background: `linear-gradient(135deg, ${BLUSH}, #DB2777)`,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: 26,
+              boxShadow: `0 8px 18px ${BLUSH}55`,
+              transform: "rotate(-8deg)",
+              flexShrink: 0,
+            }}
+            aria-hidden
           >
-            Photo Studio
-          </h1>
-          <p className="text-[11px] text-muted-foreground mt-1 font-semibold flex items-center gap-1">
-            <Users className="w-3 h-3" />
-            {primaryClass.name} · {format(new Date(), "EEEE, d MMM")}
-          </p>
-        </div>
-      </div>
-
-      {/* Stats banner */}
-      <div className="rounded-2xl bg-gradient-to-br from-edu-pink to-edu-navy text-white p-4 shadow-md">
-        <div className="flex items-center gap-2 text-[10px] uppercase tracking-widest text-white/70 font-bold">
-          <Sparkles className="w-3 h-3" /> Today
-        </div>
-        <div className="grid grid-cols-3 gap-3 mt-2">
-          <Stat label="Photos" value={stats.total} />
-          <Stat
-            label="Kids in photos"
-            value={`${stats.taggedKids}/${stats.rosterSize || "—"}`}
-          />
-          <Stat
-            label="Active slot"
-            value={activeSlot ? "Live" : "—"}
-            sub={activeSlot?.title}
-          />
-        </div>
-      </div>
-
-      {/* Uploader */}
-      <Card>
-        <CardContent className="p-4 space-y-3">
-          {/* Hidden inputs */}
-          <input
-            ref={cameraInputRef}
-            type="file"
-            accept="image/*"
-            capture="environment"
-            className="hidden"
-            onChange={(e) => {
-              handleFilesPicked(e.target.files);
-              e.target.value = "";
-            }}
-          />
-          <input
-            ref={galleryInputRef}
-            type="file"
-            accept="image/*"
-            multiple
-            className="hidden"
-            onChange={(e) => {
-              handleFilesPicked(e.target.files);
-              e.target.value = "";
-            }}
-          />
-
-          {/* CTA buttons */}
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              type="button"
-              onClick={() => cameraInputRef.current?.click()}
-              disabled={uploading}
-              className="h-14 rounded-2xl bg-edu-navy text-white font-bold flex items-center justify-center gap-2 active:scale-95 transition disabled:opacity-50"
+            📸
+          </span>
+          <div style={{ flex: 1, minWidth: 200 }}>
+            <p
+              style={{
+                fontSize: 11,
+                fontWeight: 800,
+                letterSpacing: "0.16em",
+                textTransform: "uppercase",
+                color: BLUSH,
+                opacity: 0.9,
+              }}
             >
-              <Camera className="w-5 h-5" />
-              Camera
-            </button>
-            <button
-              type="button"
-              onClick={() => galleryInputRef.current?.click()}
-              disabled={uploading}
-              className="h-14 rounded-2xl bg-edu-light-blue text-edu-blue font-bold flex items-center justify-center gap-2 active:scale-95 transition disabled:opacity-50"
+              Moments of the day
+            </p>
+            <h1
+              style={{
+                fontSize: isDesktop ? 26 : 21,
+                fontWeight: 800,
+                letterSpacing: "-0.6px",
+                color: NAVY,
+                marginTop: 2,
+              }}
             >
-              <ImageIcon className="w-5 h-5" />
-              From Gallery
-            </button>
-          </div>
-
-          {/* Previews */}
-          {previews.length > 0 && (
-            <>
-              <div className="border-t border-border pt-3">
-                <p className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground mb-2">
-                  Selected · {previews.length}
-                </p>
-                <div
-                  className={cn(
-                    "grid gap-2",
-                    isDesktop ? "grid-cols-6" : "grid-cols-3"
-                  )}
-                >
-                  {previews.map((p, i) => (
-                    <div
-                      key={p.url}
-                      className="relative aspect-square rounded-xl overflow-hidden bg-secondary"
-                    >
-                      <img
-                        src={p.url}
-                        alt={`Preview ${i + 1}`}
-                        className="w-full h-full object-cover"
-                      />
-                      {!uploading && (
-                        <button
-                          type="button"
-                          onClick={() => removePreview(i)}
-                          className="absolute top-1 right-1 w-6 h-6 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-black/80"
-                          aria-label={`Remove ${p.file.name}`}
-                        >
-                          <X className="w-3 h-3" />
-                        </button>
-                      )}
-                      {progress[i] && progress[i].status !== "pending" && (
-                        <div className="absolute inset-x-0 bottom-0 bg-black/60 text-white px-2 py-1 text-[10px] font-bold">
-                          {progress[i].status === "done" ? (
-                            <span className="flex items-center gap-1 text-edu-green">
-                              <CheckCircle2 className="w-3 h-3" />
-                              Done
-                            </span>
-                          ) : progress[i].status === "error" ? (
-                            <span className="flex items-center gap-1 text-edu-red">
-                              <AlertTriangle className="w-3 h-3" />
-                              Failed
-                            </span>
-                          ) : (
-                            <span className="flex items-center gap-1">
-                              <Loader2 className="w-3 h-3 animate-spin" />
-                              {progress[i].progress}%
-                            </span>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Tag children */}
-              <div className="border-t border-border pt-3">
-                <div className="flex items-center justify-between mb-2">
-                  <p className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground flex items-center gap-1">
-                    <Tag className="w-3 h-3" /> Tag children in these photos
-                  </p>
-                  <p className="text-[10px] font-bold text-edu-blue">
-                    {taggedIds.size} selected
-                  </p>
-                </div>
-                <div className="flex flex-wrap gap-1.5 max-h-40 overflow-y-auto">
-                  {rosterLoading ? (
-                    <p className="text-xs text-muted-foreground">Loading roster…</p>
-                  ) : (
-                    roster.map((child) => (
-                      <TagChip
-                        key={child.id}
-                        child={child}
-                        selected={taggedIds.has(child.id)}
-                        onToggle={() => toggleTag(child.id)}
-                        disabled={uploading}
-                      />
-                    ))
-                  )}
-                </div>
-              </div>
-
-              {/* Auto-attach */}
-              {activeSlot && (
-                <label className="flex items-center gap-2 rounded-xl border border-edu-blue/30 bg-edu-light-blue/30 p-3 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={attachToSlot}
-                    onChange={(e) => setAttachToSlot(e.target.checked)}
-                    disabled={uploading}
-                    className="w-4 h-4"
-                  />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-bold text-edu-navy">
-                      Attach to current activity
-                    </p>
-                    <p className="text-[10px] text-muted-foreground truncate">
-                      {activeSlot.title} · in progress
-                    </p>
-                  </div>
-                </label>
-              )}
-
-              {/* Caption */}
-              <div>
-                <Input
-                  value={caption}
-                  onChange={(e) => setCaption(e.target.value)}
-                  placeholder="Caption (optional)"
-                  disabled={uploading}
-                  maxLength={200}
-                />
-              </div>
-
-              {/* Upload button */}
-              <button
-                type="button"
-                onClick={handleUpload}
-                disabled={uploading}
-                className="w-full h-12 rounded-2xl bg-edu-navy text-white font-bold flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50"
+              Photo Studio{" "}
+              <span
+                aria-hidden
+                style={{ display: "inline-block", transform: "rotate(6deg)" }}
               >
-                {uploading ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Uploading {previews.length}…
-                  </>
+                ✨
+              </span>
+            </h1>
+            <p
+              style={{
+                fontSize: isDesktop ? 13 : 12,
+                fontWeight: 500,
+                color: "#64748B",
+                marginTop: 4,
+              }}
+            >
+              {primaryClass.name} · {format(new Date(), "EEEE, d MMM")} ·
+              Capture + tag — parents see them live
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* 3-stat strip */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+          gap: 10,
+        }}
+      >
+        <CounterCard
+          label="Photos"
+          value={stats.total}
+          emoji="📸"
+          tone={BLUSH}
+          surface="linear-gradient(135deg, #FFE0EC 0%, #FFF4F8 100%)"
+        />
+        <CounterCardFraction
+          label="Kids in photos"
+          value={stats.taggedKids}
+          total={stats.rosterSize}
+          emoji="👶"
+          tone={SKY}
+          surface="linear-gradient(135deg, #DCEEFF 0%, #F5FAFF 100%)"
+        />
+        <CounterCardText
+          label="Active slot"
+          value={activeSlot ? "🟢 Live" : "—"}
+          sub={activeSlot?.title}
+          tone={activeSlot ? MINT : "#94A3B8"}
+          surface={
+            activeSlot
+              ? "linear-gradient(135deg, #D6F5E2 0%, #F1FBF5 100%)"
+              : "linear-gradient(135deg, #F1F5F9 0%, #FFFFFF 100%)"
+          }
+        />
+      </div>
+
+      {/* Uploader card */}
+      <div
+        style={{
+          position: "relative",
+          overflow: "hidden",
+          borderRadius: 22,
+          padding: 16,
+          background: "#fff",
+          boxShadow: PILLOW,
+          display: "flex",
+          flexDirection: "column",
+          gap: 14,
+        }}
+      >
+        {/* Hidden inputs */}
+        <input
+          ref={cameraInputRef}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          style={{ display: "none" }}
+          onChange={(e) => {
+            handleFilesPicked(e.target.files);
+            e.target.value = "";
+          }}
+        />
+        <input
+          ref={galleryInputRef}
+          type="file"
+          accept="image/*"
+          multiple
+          style={{ display: "none" }}
+          onChange={(e) => {
+            handleFilesPicked(e.target.files);
+            e.target.value = "";
+          }}
+        />
+
+        {/* Big CTA tiles */}
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "1fr 1fr",
+            gap: 10,
+          }}
+        >
+          <CTATile
+            onClick={() => cameraInputRef.current?.click()}
+            disabled={uploading}
+            emoji="📷"
+            label="Camera"
+            tone={BLUSH}
+            gradient={`linear-gradient(135deg, ${BLUSH}, #DB2777)`}
+          />
+          <CTATile
+            onClick={() => galleryInputRef.current?.click()}
+            disabled={uploading}
+            emoji="🖼️"
+            label="From Gallery"
+            tone={SKY}
+            gradient={`linear-gradient(135deg, ${SKY}, #0284C7)`}
+          />
+        </div>
+
+        {/* Previews + tag + caption + upload */}
+        {previews.length > 0 && (
+          <>
+            <div style={{ borderTop: "1px dashed rgba(15,23,42,0.12)", paddingTop: 14 }}>
+              <FieldLabel emoji="🎞️">
+                Selected · {previews.length}
+              </FieldLabel>
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: previewCols,
+                  gap: 8,
+                }}
+              >
+                {previews.map((p, i) => (
+                  <PreviewTile
+                    key={p.url}
+                    src={p.url}
+                    alt={`Preview ${i + 1}`}
+                    canRemove={!uploading}
+                    onRemove={() => removePreview(i)}
+                    progress={progress[i]}
+                  />
+                ))}
+              </div>
+            </div>
+
+            {/* Tag children */}
+            <div style={{ borderTop: "1px dashed rgba(15,23,42,0.12)", paddingTop: 14 }}>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  marginBottom: 8,
+                }}
+              >
+                <FieldLabel emoji="🏷️">Tag children in these photos</FieldLabel>
+                <span
+                  style={{
+                    fontSize: 10,
+                    fontWeight: 800,
+                    color: BLUSH,
+                    padding: "3px 9px",
+                    borderRadius: 999,
+                    background: `${BLUSH}1f`,
+                  }}
+                >
+                  {taggedIds.size} selected
+                </span>
+              </div>
+              <div
+                style={{
+                  display: "flex",
+                  flexWrap: "wrap",
+                  gap: 6,
+                  maxHeight: 200,
+                  overflowY: "auto",
+                  paddingRight: 4,
+                }}
+              >
+                {rosterLoading ? (
+                  <p style={{ fontSize: 12, color: "#64748B" }}>Loading roster…</p>
                 ) : (
-                  <>
-                    <Upload className="w-4 h-4" />
-                    Upload {previews.length} photo{previews.length === 1 ? "" : "s"}
-                  </>
+                  roster.map((child) => (
+                    <TagChip
+                      key={child.id}
+                      child={child}
+                      selected={taggedIds.has(child.id)}
+                      onToggle={() => toggleTag(child.id)}
+                      disabled={uploading}
+                    />
+                  ))
                 )}
-              </button>
-            </>
-          )}
-        </CardContent>
-      </Card>
+              </div>
+            </div>
+
+            {/* Attach to slot */}
+            {activeSlot && (
+              <label
+                style={{
+                  position: "relative",
+                  overflow: "hidden",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 10,
+                  padding: 12,
+                  borderRadius: 16,
+                  background: attachToSlot
+                    ? "linear-gradient(135deg, #D6F5E2 0%, #F1FBF5 100%)"
+                    : "#F8FAFC",
+                  boxShadow: attachToSlot
+                    ? `inset 0 0 0 2px ${MINT}, ${PILLOW}`
+                    : "inset 0 0 0 1px #E2E8F0",
+                  cursor: "pointer",
+                }}
+              >
+                {attachToSlot && <DotScribbles color={MINT} />}
+                <input
+                  type="checkbox"
+                  checked={attachToSlot}
+                  onChange={(e) => setAttachToSlot(e.target.checked)}
+                  disabled={uploading}
+                  style={{
+                    width: 16,
+                    height: 16,
+                    accentColor: MINT,
+                    cursor: "pointer",
+                    position: "relative",
+                    zIndex: 1,
+                  }}
+                />
+                <div style={{ position: "relative", zIndex: 1, flex: 1, minWidth: 0 }}>
+                  <p
+                    style={{
+                      fontSize: 12,
+                      fontWeight: 800,
+                      color: attachToSlot ? "#047857" : NAVY,
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 4,
+                    }}
+                  >
+                    🎨 Attach to current activity
+                  </p>
+                  <p
+                    style={{
+                      fontSize: 10,
+                      color: "#64748B",
+                      marginTop: 2,
+                      whiteSpace: "nowrap",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                    }}
+                  >
+                    {activeSlot.title} · in progress
+                  </p>
+                </div>
+              </label>
+            )}
+
+            {/* Caption */}
+            <PillowInput
+              value={caption}
+              onChange={setCaption}
+              placeholder="Caption (optional)"
+              disabled={uploading}
+              maxLength={200}
+            />
+
+            {/* Upload pillow */}
+            <button
+              type="button"
+              onClick={handleUpload}
+              disabled={uploading}
+              style={{
+                width: "100%",
+                padding: "14px 18px",
+                borderRadius: 18,
+                background: uploading
+                  ? "#CBD5E1"
+                  : `linear-gradient(135deg, ${BLUSH}, #DB2777)`,
+                color: "#fff",
+                fontSize: 14,
+                fontWeight: 800,
+                letterSpacing: "-0.1px",
+                border: "none",
+                cursor: uploading ? "default" : "pointer",
+                boxShadow: uploading ? "none" : `0 12px 28px -8px ${BLUSH}88`,
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 8,
+              }}
+              className="active:scale-95 hover:-translate-y-0.5 transition"
+            >
+              {uploading ? (
+                <>
+                  <Loader2 size={16} className="animate-spin" />
+                  Uploading {previews.length}…
+                </>
+              ) : (
+                <>
+                  <Upload size={16} strokeWidth={2.4} />
+                  Upload {previews.length} photo
+                  {previews.length === 1 ? "" : "s"}
+                </>
+              )}
+            </button>
+          </>
+        )}
+      </div>
 
       {/* Today's photos */}
       <div>
-        <p className="text-sm font-bold text-edu-navy mb-2 px-1">
-          Today's photos
-        </p>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            marginBottom: 10,
+            paddingLeft: 4,
+          }}
+        >
+          <span
+            aria-hidden
+            style={{
+              fontSize: 14,
+              transform: "rotate(-6deg)",
+              display: "inline-block",
+            }}
+          >
+            🎞️
+          </span>
+          <p
+            style={{
+              fontSize: 11,
+              fontWeight: 800,
+              letterSpacing: "0.14em",
+              textTransform: "uppercase",
+              color: NAVY,
+              opacity: 0.75,
+            }}
+          >
+            Today's photos
+          </p>
+        </div>
+
         {photosLoading ? (
-          <Card>
-            <CardContent className="p-8 text-center">
-              <Loader2 className="w-5 h-5 animate-spin text-muted-foreground mx-auto" />
-            </CardContent>
-          </Card>
+          <CenteredLoader label="" />
         ) : photos.length === 0 ? (
-          <Card>
-            <CardContent className="p-8 text-center">
-              <p className="text-4xl mb-2">📷</p>
-              <p className="text-sm font-bold text-edu-navy">No photos yet</p>
-              <p className="text-xs text-muted-foreground mt-1">
-                Capture moments from today — parents will see them in their app live.
-              </p>
-            </CardContent>
-          </Card>
+          <div
+            style={{
+              textAlign: "center",
+              padding: "40px 16px",
+              borderRadius: 22,
+              background: "#fff",
+              boxShadow: PILLOW,
+            }}
+          >
+            <p style={{ fontSize: 40, marginBottom: 8 }} aria-hidden>
+              📷
+            </p>
+            <p style={{ fontSize: 15, fontWeight: 800, color: NAVY }}>
+              No photos yet
+            </p>
+            <p
+              style={{
+                fontSize: 12,
+                color: "#64748B",
+                marginTop: 6,
+                lineHeight: 1.5,
+              }}
+            >
+              Capture moments from today — parents will see them in their app live.
+            </p>
+          </div>
         ) : (
           <div
-            className={cn(
-              "grid gap-2",
-              isDesktop ? "grid-cols-5" : "grid-cols-3"
-            )}
+            style={{
+              display: "grid",
+              gridTemplateColumns: photoCols,
+              gap: 8,
+            }}
           >
             {photos.map((p) => (
               <PhotoCard
@@ -495,21 +677,50 @@ export default function Photos() {
       {/* Fullscreen viewer */}
       {fullscreenPhoto && (
         <div
-          className="fixed inset-0 z-[60] bg-black/95 flex items-center justify-center animate-fade-in"
           onClick={() => setFullscreenPhoto(null)}
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 60,
+            background: "rgba(0,0,0,0.95)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            animation: "fade-in 200ms ease-out",
+          }}
         >
           <button
             type="button"
             onClick={() => setFullscreenPhoto(null)}
-            className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/10 text-white flex items-center justify-center hover:bg-white/20"
             aria-label="Close"
+            style={{
+              position: "absolute",
+              top: 16,
+              right: 16,
+              width: 44,
+              height: 44,
+              borderRadius: 999,
+              background: "rgba(255,255,255,0.12)",
+              color: "#fff",
+              border: "none",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              cursor: "pointer",
+              backdropFilter: "blur(10px)",
+              WebkitBackdropFilter: "blur(10px)",
+            }}
           >
-            <X className="w-5 h-5" />
+            <X size={20} />
           </button>
           <img
             src={fullscreenPhoto}
             alt="Full screen"
-            className="max-w-full max-h-full object-contain"
+            style={{
+              maxWidth: "100%",
+              maxHeight: "100%",
+              objectFit: "contain",
+            }}
             onClick={(e) => e.stopPropagation()}
           />
         </div>
@@ -518,23 +729,444 @@ export default function Photos() {
   );
 }
 
-function Stat({
+/* ═══════════════════════ building blocks ═══════════════════════ */
+
+function CenteredLoader({ label }: { label: string }) {
+  return (
+    <div
+      style={{
+        padding: "32px 16px",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        gap: 12,
+        color: "#64748B",
+      }}
+    >
+      <Loader2 className="animate-spin" />
+      {label && <p style={{ fontSize: 12, fontWeight: 600 }}>{label}</p>}
+    </div>
+  );
+}
+
+function CounterCard({
+  label,
+  value,
+  emoji,
+  tone,
+  surface,
+}: {
+  label: string;
+  value: number;
+  emoji: string;
+  tone: string;
+  surface: string;
+}) {
+  return (
+    <div
+      style={{
+        position: "relative",
+        overflow: "hidden",
+        borderRadius: 22,
+        padding: "12px 12px 10px",
+        background: surface,
+        boxShadow: PILLOW,
+      }}
+    >
+      <DotScribbles color={tone} />
+      <div
+        style={{
+          display: "flex",
+          alignItems: "baseline",
+          justifyContent: "space-between",
+          position: "relative",
+          zIndex: 1,
+        }}
+      >
+        <span
+          style={{
+            fontSize: 28,
+            fontWeight: 900,
+            letterSpacing: "-1.2px",
+            color: tone,
+            lineHeight: 1,
+          }}
+        >
+          {value}
+        </span>
+        <span
+          style={{
+            fontSize: 20,
+            lineHeight: 1,
+            transform: "rotate(8deg)",
+            filter: "drop-shadow(0 3px 6px rgba(0,0,0,0.08))",
+          }}
+          aria-hidden
+        >
+          {emoji}
+        </span>
+      </div>
+      <p
+        style={{
+          fontSize: 10,
+          fontWeight: 800,
+          letterSpacing: "0.12em",
+          textTransform: "uppercase",
+          color: tone,
+          opacity: 0.75,
+          marginTop: 6,
+          position: "relative",
+          zIndex: 1,
+        }}
+      >
+        {label}
+      </p>
+    </div>
+  );
+}
+
+function CounterCardFraction({
+  label,
+  value,
+  total,
+  emoji,
+  tone,
+  surface,
+}: {
+  label: string;
+  value: number;
+  total: number;
+  emoji: string;
+  tone: string;
+  surface: string;
+}) {
+  return (
+    <div
+      style={{
+        position: "relative",
+        overflow: "hidden",
+        borderRadius: 22,
+        padding: "12px 12px 10px",
+        background: surface,
+        boxShadow: PILLOW,
+      }}
+    >
+      <DotScribbles color={tone} />
+      <div
+        style={{
+          display: "flex",
+          alignItems: "baseline",
+          justifyContent: "space-between",
+          position: "relative",
+          zIndex: 1,
+          gap: 4,
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "baseline", gap: 2 }}>
+          <span
+            style={{
+              fontSize: 28,
+              fontWeight: 900,
+              letterSpacing: "-1.2px",
+              color: tone,
+              lineHeight: 1,
+            }}
+          >
+            {value}
+          </span>
+          <span
+            style={{
+              fontSize: 12,
+              fontWeight: 700,
+              color: tone,
+              opacity: 0.55,
+            }}
+          >
+            /{total || "—"}
+          </span>
+        </div>
+        <span
+          style={{
+            fontSize: 20,
+            lineHeight: 1,
+            transform: "rotate(8deg)",
+            filter: "drop-shadow(0 3px 6px rgba(0,0,0,0.08))",
+          }}
+          aria-hidden
+        >
+          {emoji}
+        </span>
+      </div>
+      <p
+        style={{
+          fontSize: 10,
+          fontWeight: 800,
+          letterSpacing: "0.12em",
+          textTransform: "uppercase",
+          color: tone,
+          opacity: 0.75,
+          marginTop: 6,
+          position: "relative",
+          zIndex: 1,
+        }}
+      >
+        {label}
+      </p>
+    </div>
+  );
+}
+
+function CounterCardText({
   label,
   value,
   sub,
+  tone,
+  surface,
 }: {
   label: string;
-  value: string | number;
+  value: string;
   sub?: string;
+  tone: string;
+  surface: string;
 }) {
   return (
-    <div>
-      <p className="text-2xl font-black leading-none">{value}</p>
-      <p className="text-[10px] uppercase tracking-widest font-bold text-white/70 mt-1">
+    <div
+      style={{
+        position: "relative",
+        overflow: "hidden",
+        borderRadius: 22,
+        padding: "12px 12px 10px",
+        background: surface,
+        boxShadow: PILLOW,
+      }}
+    >
+      <DotScribbles color={tone} />
+      <p
+        style={{
+          fontSize: 15,
+          fontWeight: 900,
+          letterSpacing: "-0.4px",
+          color: tone,
+          lineHeight: 1.2,
+          position: "relative",
+          zIndex: 1,
+        }}
+      >
+        {value}
+      </p>
+      <p
+        style={{
+          fontSize: 10,
+          fontWeight: 800,
+          letterSpacing: "0.12em",
+          textTransform: "uppercase",
+          color: tone,
+          opacity: 0.75,
+          marginTop: 4,
+          position: "relative",
+          zIndex: 1,
+        }}
+      >
         {label}
       </p>
       {sub && (
-        <p className="text-[10px] text-white/60 mt-0.5 truncate">{sub}</p>
+        <p
+          style={{
+            fontSize: 10,
+            fontWeight: 600,
+            color: "#64748B",
+            marginTop: 2,
+            position: "relative",
+            zIndex: 1,
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+          }}
+        >
+          {sub}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function CTATile({
+  onClick,
+  disabled,
+  emoji,
+  label,
+  tone,
+  gradient,
+}: {
+  onClick: () => void;
+  disabled: boolean;
+  emoji: string;
+  label: string;
+  tone: string;
+  gradient: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      style={{
+        position: "relative",
+        overflow: "hidden",
+        height: 72,
+        borderRadius: 18,
+        background: gradient,
+        color: "#fff",
+        fontSize: 14,
+        fontWeight: 800,
+        border: "none",
+        cursor: disabled ? "default" : "pointer",
+        opacity: disabled ? 0.6 : 1,
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 10,
+        boxShadow: `0 12px 28px -8px ${tone}88`,
+        transition: "transform 140ms ease",
+      }}
+      className="active:scale-95 hover:-translate-y-0.5"
+    >
+      <span
+        style={{
+          fontSize: 26,
+          transform: "rotate(-8deg)",
+          display: "inline-block",
+          filter: "drop-shadow(0 3px 6px rgba(0,0,0,0.2))",
+        }}
+        aria-hidden
+      >
+        {emoji}
+      </span>
+      {label}
+    </button>
+  );
+}
+
+function PreviewTile({
+  src,
+  alt,
+  canRemove,
+  onRemove,
+  progress,
+}: {
+  src: string;
+  alt: string;
+  canRemove: boolean;
+  onRemove: () => void;
+  progress?: UploadProgress;
+}) {
+  return (
+    <div
+      style={{
+        position: "relative",
+        aspectRatio: "1 / 1",
+        borderRadius: 14,
+        overflow: "hidden",
+        background: "#F1F5F9",
+        boxShadow: "inset 0 0 0 1px rgba(15,23,42,0.08)",
+      }}
+    >
+      <img
+        src={src}
+        alt={alt}
+        style={{ width: "100%", height: "100%", objectFit: "cover" }}
+      />
+      {canRemove && (
+        <button
+          type="button"
+          onClick={onRemove}
+          aria-label={`Remove ${alt}`}
+          style={{
+            position: "absolute",
+            top: 4,
+            right: 4,
+            width: 24,
+            height: 24,
+            borderRadius: 999,
+            background: "rgba(0,0,0,0.6)",
+            color: "#fff",
+            border: "none",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            cursor: "pointer",
+          }}
+        >
+          <X size={12} strokeWidth={2.6} />
+        </button>
+      )}
+      {progress && progress.status !== "pending" && (
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            display: "flex",
+            alignItems: "flex-end",
+            justifyContent: "center",
+            padding: 6,
+            background:
+              "linear-gradient(to top, rgba(0,0,0,0.65) 0%, transparent 60%)",
+          }}
+        >
+          {progress.status === "done" ? (
+            <span
+              style={{
+                fontSize: 10,
+                fontWeight: 900,
+                color: "#fff",
+                background: MINT,
+                padding: "3px 8px",
+                borderRadius: 999,
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 4,
+                boxShadow: `0 4px 10px ${MINT}55`,
+              }}
+            >
+              <CheckCircle2 size={11} strokeWidth={3} />
+              Done
+            </span>
+          ) : progress.status === "error" ? (
+            <span
+              style={{
+                fontSize: 10,
+                fontWeight: 900,
+                color: "#fff",
+                background: RED,
+                padding: "3px 8px",
+                borderRadius: 999,
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 4,
+              }}
+            >
+              <AlertTriangle size={11} strokeWidth={2.6} />
+              Failed
+            </span>
+          ) : (
+            <span
+              style={{
+                fontSize: 10,
+                fontWeight: 900,
+                color: "#fff",
+                background: "rgba(0,0,0,0.6)",
+                padding: "3px 8px",
+                borderRadius: 999,
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 4,
+              }}
+            >
+              <Loader2 size={11} className="animate-spin" />
+              {progress.progress}%
+            </span>
+          )}
+        </div>
       )}
     </div>
   );
@@ -551,34 +1183,43 @@ function TagChip({
   onToggle: () => void;
   disabled?: boolean;
 }) {
-  const initials = child.name
-    .split(/\s+/)
-    .map((s) => s[0])
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
   return (
     <button
       type="button"
       onClick={onToggle}
       disabled={disabled}
-      className={cn(
-        "flex items-center gap-2 pl-1 pr-3 py-1 rounded-full border-2 text-xs font-bold transition active:scale-95 disabled:opacity-50",
-        selected
-          ? "border-edu-navy bg-edu-navy text-white"
-          : "border-border bg-white text-foreground hover:border-edu-navy/40"
-      )}
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 6,
+        padding: "3px 10px 3px 3px",
+        borderRadius: 999,
+        background: selected
+          ? `linear-gradient(135deg, ${BLUSH}, #DB2777)`
+          : "#fff",
+        color: selected ? "#fff" : NAVY,
+        border: "none",
+        cursor: disabled ? "default" : "pointer",
+        opacity: disabled ? 0.5 : 1,
+        fontSize: 12,
+        fontWeight: 800,
+        boxShadow: selected
+          ? `0 6px 14px -4px ${BLUSH}66`
+          : "inset 0 0 0 1px #CBD5E1, 0 2px 6px rgba(15,23,42,0.04)",
+        transition: "transform 140ms ease",
+      }}
+      className="active:scale-95 hover:-translate-y-0.5"
     >
-      <span
-        className={cn(
-          "w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black",
-          selected ? "bg-white/20" : "bg-edu-light-blue text-edu-blue"
-        )}
-      >
-        {initials}
+      <span style={{ flexShrink: 0 }}>
+        <CartoonAvatar
+          name={child.name}
+          size={26}
+          ringColor={selected ? "#fff" : BLUSH}
+          ringWidth={2}
+        />
       </span>
       {child.name.split(" ")[0]}
-      {selected && <CheckCircle2 className="w-3.5 h-3.5" />}
+      {selected && <CheckCircle2 size={12} strokeWidth={3} />}
     </button>
   );
 }
@@ -593,36 +1234,214 @@ function PhotoCard({
   onDelete: () => void;
 }) {
   return (
-    <div className="relative group rounded-xl overflow-hidden bg-secondary aspect-square">
+    <div
+      style={{
+        position: "relative",
+        aspectRatio: "1 / 1",
+        borderRadius: 18,
+        overflow: "hidden",
+        background: "#F1F5F9",
+        boxShadow: PILLOW,
+      }}
+      className="group"
+    >
       <img
         src={photo.storageUrl}
         alt={photo.caption || "Photo"}
-        className="w-full h-full object-cover cursor-pointer"
-        onClick={onView}
         loading="lazy"
+        onClick={onView}
+        style={{
+          width: "100%",
+          height: "100%",
+          objectFit: "cover",
+          cursor: "pointer",
+          transition: "transform 240ms ease",
+        }}
+        className="hover:scale-105"
       />
-
-      {/* Overlay info */}
-      <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent text-white p-2 text-[10px] font-semibold pointer-events-none">
+      {/* Tagged badge */}
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
+          background:
+            "linear-gradient(to top, rgba(0,0,0,0.7) 0%, transparent 50%)",
+          display: "flex",
+          alignItems: "flex-end",
+          padding: 8,
+          pointerEvents: "none",
+        }}
+      >
         {photo.taggedStudentIds.length > 0 ? (
-          <span className="flex items-center gap-1">
-            <Tag className="w-3 h-3" />
+          <span
+            style={{
+              fontSize: 10,
+              fontWeight: 800,
+              color: "#fff",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 4,
+            }}
+          >
+            <Tag size={11} strokeWidth={2.6} />
             {photo.taggedStudentIds.length} tagged
           </span>
         ) : (
-          <span className="opacity-70">Untagged</span>
+          <span style={{ fontSize: 10, fontWeight: 600, color: "rgba(255,255,255,0.7)" }}>
+            Untagged
+          </span>
         )}
       </div>
-
+      {/* Delete button */}
       <button
         type="button"
         onClick={onDelete}
-        className="absolute top-1 right-1 w-7 h-7 rounded-full bg-black/60 text-white opacity-0 group-hover:opacity-100 transition flex items-center justify-center hover:bg-edu-red/80"
         aria-label="Delete photo"
         title="Delete"
+        style={{
+          position: "absolute",
+          top: 6,
+          right: 6,
+          width: 30,
+          height: 30,
+          borderRadius: 999,
+          background: "rgba(0,0,0,0.65)",
+          color: "#fff",
+          border: "none",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          cursor: "pointer",
+          opacity: 0,
+          transition: "opacity 160ms ease, transform 140ms ease",
+        }}
+        className="group-hover:opacity-100 active:scale-90"
       >
-        <Trash2 className="w-3.5 h-3.5" />
+        <Trash2 size={14} strokeWidth={2.4} />
       </button>
     </div>
   );
 }
+
+function PillowInput({
+  value,
+  onChange,
+  placeholder,
+  maxLength,
+  disabled,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+  maxLength?: number;
+  disabled?: boolean;
+}) {
+  return (
+    <input
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      placeholder={placeholder}
+      maxLength={maxLength}
+      disabled={disabled}
+      style={{
+        width: "100%",
+        padding: "12px 14px",
+        borderRadius: 16,
+        background: "#fff",
+        border: "none",
+        fontSize: 13,
+        fontWeight: 600,
+        color: "#0F172A",
+        outline: "none",
+        boxShadow: "inset 0 0 0 1px #E2E8F0",
+        opacity: disabled ? 0.6 : 1,
+      }}
+    />
+  );
+}
+
+function FieldLabel({
+  emoji,
+  children,
+}: {
+  emoji?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 6,
+        marginBottom: 8,
+      }}
+    >
+      {emoji && (
+        <span
+          aria-hidden
+          style={{
+            fontSize: 13,
+            transform: "rotate(-6deg)",
+            display: "inline-block",
+          }}
+        >
+          {emoji}
+        </span>
+      )}
+      <p
+        style={{
+          fontSize: 10,
+          fontWeight: 800,
+          letterSpacing: "0.14em",
+          textTransform: "uppercase",
+          color: NAVY,
+          opacity: 0.75,
+        }}
+      >
+        {children}
+      </p>
+    </div>
+  );
+}
+
+function DotScribbles({
+  color,
+  dense = false,
+}: {
+  color: string;
+  dense?: boolean;
+}) {
+  return (
+    <svg
+      aria-hidden="true"
+      width="100%"
+      height="100%"
+      style={{
+        position: "absolute",
+        inset: 0,
+        opacity: dense ? 0.1 : 0.07,
+        pointerEvents: "none",
+      }}
+    >
+      <circle cx="14%" cy="24%" r="2.5" fill={color} />
+      <circle cx="82%" cy="14%" r="1.8" fill={color} />
+      <circle cx="68%" cy="62%" r="2" fill={color} />
+      <circle cx="22%" cy="80%" r="1.6" fill={color} />
+      <circle cx="48%" cy="32%" r="1.4" fill={color} />
+      {dense && (
+        <>
+          <circle cx="90%" cy="80%" r="2.2" fill={color} />
+          <circle cx="6%" cy="60%" r="1.4" fill={color} />
+          <circle cx="55%" cy="88%" r="1.6" fill={color} />
+        </>
+      )}
+    </svg>
+  );
+}
+
+// Palette constants reserved for future variants on this page.
+void PEACH;
+void LAV;
+void BUTTER;
+void Camera;
+void ImageIcon;

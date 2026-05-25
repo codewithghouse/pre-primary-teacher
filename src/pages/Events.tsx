@@ -1,17 +1,11 @@
 /**
  * Events.tsx — Pre-primary teacher's class-scoped calendar composer.
- *
- * Writes to the same `pp_events` collection that the
- * pre-primary-parent-dashboard /calendar page subscribes to, BUT scoped
- * strictly to the teacher's assigned class (audience='class',
- * classId=primaryClass.id is FORCED — no audience picker on this surface).
- *
- * Mirrors the Notices composer UX so the teacher has a single mental
- * model. Distinct mobile + desktop layouts per project policy.
+ * Cartoonified 2026-05-25. Writes to pp_events with audience='class' +
+ * classId forced. Teacher sees school/stage/own-class events but can only
+ * edit/delete events they created.
  */
 import { useEffect, useMemo, useState } from "react";
 import {
-  Calendar as CalendarIcon,
   Plus,
   Loader2,
   Pencil,
@@ -21,10 +15,14 @@ import {
   X,
   MapPin,
   Clock,
-  Sparkles,
+  Calendar as CalendarIcon,
 } from "lucide-react";
 import { toast } from "sonner";
-import { format, formatDistanceToNow, parseISO, differenceInCalendarDays } from "date-fns";
+import {
+  format,
+  parseISO,
+  differenceInCalendarDays,
+} from "date-fns";
 import { db } from "@/lib/firebase";
 import {
   addDoc,
@@ -35,7 +33,6 @@ import {
   orderBy,
   query,
   serverTimestamp,
-  Timestamp,
   updateDoc,
   where,
   type DocumentData,
@@ -43,11 +40,25 @@ import {
 import { useAuth } from "@/lib/AuthContext";
 import { useTeacherClass } from "@/hooks/useTeacherClass";
 import { useIsDesktop } from "@/hooks/useIsDesktop";
-import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { cn } from "@/lib/utils";
 
-// Same set as parent useEvents.ts so types stay in sync
+/* ═══════════════════════════════════════════════════════════════════════
+   PRE-PRIMARY TEACHER · CLASS EVENTS
+   Storybook-sherbet calendar composer. Sherbet surface per event type,
+   tappable date block per card, mine-only edit/delete actions.
+   ════════════════════════════════════════════════════════════════════════ */
+
+const NAVY = "#1e3272";
+const MINT = "#10B981";
+const PEACH = "#FB923C";
+const BLUSH = "#EC4899";
+const SKY = "#0EA5E9";
+const LAV = "#A78BFA";
+const BUTTER = "#F59E0B";
+const RED = "#EF4444";
+
+const PILLOW =
+  "0 1px 0 rgba(255,255,255,0.55) inset, 0 14px 32px -10px rgba(30,50,114,0.16), 0 4px 10px rgba(30,50,114,0.06)";
+
 const TYPES = [
   { key: "celebration", label: "Celebration", emoji: "🎉" },
   { key: "ptm", label: "PTM", emoji: "🤝" },
@@ -60,13 +71,37 @@ const TYPES = [
 type EventType = (typeof TYPES)[number]["key"];
 type Audience = "school" | "stage" | "class";
 
-const TYPE_BG: Record<EventType, string> = {
-  holiday: "bg-edu-light-red text-edu-red border-edu-red/30",
-  ptm: "bg-edu-light-blue text-edu-blue border-edu-blue/30",
-  celebration: "bg-edu-light-pink text-edu-pink border-edu-pink/30",
-  exam: "bg-edu-light-yellow text-edu-yellow border-edu-yellow/30",
-  trip: "bg-edu-light-green text-edu-green border-edu-green/30",
-  general: "bg-secondary text-edu-navy border-border",
+const TYPE_TONE: Record<EventType, { tone: string; surface: string }> = {
+  celebration: {
+    tone: BLUSH,
+    surface: "linear-gradient(135deg, #FFE0EC 0%, #FFF4F8 100%)",
+  },
+  ptm: {
+    tone: SKY,
+    surface: "linear-gradient(135deg, #DCEEFF 0%, #F5FAFF 100%)",
+  },
+  trip: {
+    tone: MINT,
+    surface: "linear-gradient(135deg, #D6F5E2 0%, #F1FBF5 100%)",
+  },
+  exam: {
+    tone: BUTTER,
+    surface: "linear-gradient(135deg, #FFEBC8 0%, #FFF7E5 100%)",
+  },
+  general: {
+    tone: NAVY,
+    surface: "linear-gradient(135deg, #E1ECFF 0%, #F7FAFF 100%)",
+  },
+  holiday: {
+    tone: RED,
+    surface: "linear-gradient(135deg, #FFD6D6 0%, #FFF1F1 100%)",
+  },
+};
+
+const AUDIENCE_META: Record<Audience, { tone: string; label: string; emoji: string }> = {
+  school: { tone: BLUSH, label: "School-wide", emoji: "🏫" },
+  stage: { tone: MINT, label: "Pre-Primary", emoji: "🌱" },
+  class: { tone: SKY, label: "Your class", emoji: "👶" },
 };
 
 interface EventRow {
@@ -138,7 +173,6 @@ export default function Events() {
       setLoading(false);
       return;
     }
-    // Pull 90 days back through 365 days forward, then filter class-audience client-side.
     const today = new Date();
     const lower = new Date(today);
     lower.setDate(lower.getDate() - 90);
@@ -191,6 +225,15 @@ export default function Events() {
     );
     return () => unsub();
   }, [schoolId, classId]);
+
+  useEffect(() => {
+    if (!dialogOpen) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [dialogOpen]);
 
   const upcoming = useMemo(() => {
     const today = todayStr();
@@ -272,7 +315,12 @@ export default function Events() {
       toast.error("End date must be on or after start date");
       return;
     }
-    if (!form.allDay && form.startTime && form.endTime && form.endTime <= form.startTime) {
+    if (
+      !form.allDay &&
+      form.startTime &&
+      form.endTime &&
+      form.endTime <= form.startTime
+    ) {
       toast.error("End time must be after start time");
       return;
     }
@@ -330,7 +378,11 @@ export default function Events() {
       toast.error("Only the principal can delete events not created by you.");
       return;
     }
-    if (!window.confirm(`Delete "${e.title}"? Parents stop seeing it immediately.`))
+    if (
+      !window.confirm(
+        `Delete "${e.title}"? Parents stop seeing it immediately.`
+      )
+    )
       return;
     try {
       await deleteDoc(doc(db, "pp_events", e.id));
@@ -341,152 +393,291 @@ export default function Events() {
     }
   };
 
-  // ── EARLY RETURNS go AFTER all hooks ──────────────────────────────────
-  if (classLoading) {
+  if (classLoading) return <CenteredLoader label="Resolving your class…" />;
+  if (!primaryClass) {
     return (
-      <div className="px-4 py-12 flex flex-col items-center text-muted-foreground gap-3">
-        <Loader2 className="w-6 h-6 animate-spin" />
-        <p className="text-xs">Resolving your class…</p>
+      <div style={{ padding: "48px 16px", textAlign: "center" }}>
+        <p style={{ fontSize: 16, fontWeight: 800, color: NAVY }}>
+          🌱 No class assigned
+        </p>
       </div>
     );
   }
 
-  if (!primaryClass) {
-    return (
-      <div className="px-4 py-12 text-center">
-        <p className="text-sm font-bold text-edu-navy">No class assigned</p>
-      </div>
-    );
-  }
+  const cardCols = isDesktop ? "repeat(2, minmax(0, 1fr))" : "1fr";
 
   return (
     <>
       <div
-        className={cn(
-          "py-4 space-y-4 animate-fade-in",
-          isDesktop ? "px-6 lg:px-10 max-w-7xl mx-auto" : "px-4"
-        )}
+        className="animate-fade-in"
+        style={{
+          padding: isDesktop ? "24px 28px 80px" : "16px 16px 80px",
+          display: "flex",
+          flexDirection: "column",
+          gap: 16,
+          width: "100%",
+        }}
       >
-        {/* Header */}
-        <div className="flex items-start justify-between gap-3 flex-wrap">
-          <div className="flex items-center gap-2">
-            <div
-              className={cn(
-                "rounded-xl bg-edu-light-pink text-edu-pink flex items-center justify-center",
-                isDesktop ? "w-10 h-10" : "w-9 h-9"
-              )}
+        {/* Hero */}
+        <div
+          style={{
+            position: "relative",
+            overflow: "hidden",
+            borderRadius: 28,
+            padding: isDesktop ? "22px 26px" : "18px 18px",
+            background:
+              "linear-gradient(135deg, #FFE0EC 0%, #FFF4F8 55%, #FFFFFF 100%)",
+            boxShadow: PILLOW,
+          }}
+        >
+          <DotScribbles color={BLUSH} dense />
+          <div
+            style={{
+              position: "relative",
+              zIndex: 1,
+              display: "flex",
+              alignItems: "center",
+              gap: 14,
+              flexWrap: "wrap",
+            }}
+          >
+            <span
+              style={{
+                width: 52,
+                height: 52,
+                borderRadius: 18,
+                background: `linear-gradient(135deg, ${BLUSH}, #DB2777)`,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: 26,
+                boxShadow: `0 8px 18px ${BLUSH}55`,
+                transform: "rotate(-8deg)",
+                flexShrink: 0,
+              }}
+              aria-hidden
             >
-              <CalendarIcon className={isDesktop ? "w-5 h-5" : "w-4 h-4"} />
-            </div>
-            <div>
-              <h1
-                className={cn(
-                  "font-black text-edu-navy leading-none",
-                  isDesktop ? "text-2xl" : "text-xl"
-                )}
+              🎉
+            </span>
+            <div style={{ flex: 1, minWidth: 200 }}>
+              <p
+                style={{
+                  fontSize: 11,
+                  fontWeight: 800,
+                  letterSpacing: "0.16em",
+                  textTransform: "uppercase",
+                  color: BLUSH,
+                  opacity: 0.9,
+                }}
               >
-                Class Events
+                Class calendar
+              </p>
+              <h1
+                style={{
+                  fontSize: isDesktop ? 26 : 21,
+                  fontWeight: 800,
+                  letterSpacing: "-0.6px",
+                  color: NAVY,
+                  marginTop: 2,
+                }}
+              >
+                Class Events{" "}
+                <span
+                  aria-hidden
+                  style={{ display: "inline-block", transform: "rotate(6deg)" }}
+                >
+                  📅
+                </span>
               </h1>
-              <p className="text-[11px] text-muted-foreground mt-1 font-semibold flex items-center gap-1">
-                <Users className="w-3 h-3" />
+              <p
+                style={{
+                  fontSize: isDesktop ? 13 : 12,
+                  fontWeight: 500,
+                  color: "#64748B",
+                  marginTop: 4,
+                }}
+              >
                 {primaryClass.name} · {format(new Date(), "EEEE, d MMM")}
               </p>
             </div>
+            <button
+              type="button"
+              onClick={openNew}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                padding: "12px 18px",
+                borderRadius: 16,
+                background: `linear-gradient(135deg, ${BLUSH}, #DB2777)`,
+                color: "#fff",
+                fontSize: 13,
+                fontWeight: 800,
+                border: "none",
+                cursor: "pointer",
+                boxShadow: `0 10px 24px -8px ${BLUSH}88`,
+              }}
+              className="active:scale-95 hover:-translate-y-0.5 transition"
+            >
+              <Plus size={16} strokeWidth={2.6} />
+              {isDesktop ? "New Event" : "New"}
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={openNew}
-            className="h-10 px-4 rounded-xl bg-edu-navy text-white font-bold text-sm flex items-center gap-1 active:scale-95"
-          >
-            <Plus className="w-4 h-4" /> New Event
-          </button>
         </div>
 
-        {/* Stats banner */}
-        <div className="rounded-2xl bg-gradient-to-br from-edu-pink to-edu-navy text-white p-4 shadow-md">
-          <div className="flex items-center gap-2 text-[10px] uppercase tracking-widest text-white/70 font-bold">
-            <Sparkles className="w-3 h-3" /> Overview
-          </div>
-          <div className="grid grid-cols-3 gap-3 mt-2">
-            <Stat label="Upcoming" value={stats.upcoming} />
-            <Stat label="This week" value={stats.thisWeek} />
-            <Stat label="Yours" value={stats.mine} />
-          </div>
+        {/* 3-stat strip */}
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+            gap: 10,
+          }}
+        >
+          <CounterCard
+            label="Upcoming"
+            value={stats.upcoming}
+            emoji="📅"
+            tone={SKY}
+            surface="linear-gradient(135deg, #DCEEFF 0%, #F5FAFF 100%)"
+          />
+          <CounterCard
+            label="This week"
+            value={stats.thisWeek}
+            emoji="⚡"
+            tone={stats.thisWeek > 0 ? BUTTER : "#94A3B8"}
+            surface={
+              stats.thisWeek > 0
+                ? "linear-gradient(135deg, #FFEBC8 0%, #FFF7E5 100%)"
+                : "linear-gradient(135deg, #F1F5F9 0%, #FFFFFF 100%)"
+            }
+          />
+          <CounterCard
+            label="Yours"
+            value={stats.mine}
+            emoji="✍️"
+            tone={BLUSH}
+            surface="linear-gradient(135deg, #FFE0EC 0%, #FFF4F8 100%)"
+          />
         </div>
 
-        {/* Tabs */}
-        <div className="flex bg-secondary rounded-xl p-1 gap-1">
+        {/* Tab toggle */}
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "1fr 1fr",
+            gap: 6,
+            padding: 4,
+            borderRadius: 16,
+            background: "#F1F5F9",
+          }}
+        >
           <TabBtn
             active={tab === "upcoming"}
             onClick={() => setTab("upcoming")}
             label="Upcoming"
             count={upcoming.length}
+            tone={SKY}
           />
           <TabBtn
             active={tab === "past"}
             onClick={() => setTab("past")}
             label="Past"
             count={past.length}
+            tone="#94A3B8"
           />
         </div>
 
         {/* Search */}
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input
-            placeholder="Search events…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-9"
-          />
-        </div>
+        <SearchPillow value={search} onChange={setSearch} />
 
         {/* Info banner */}
-        <Card className="border-edu-light-blue bg-edu-light-blue/30">
-          <CardContent className="p-3 text-[11px] text-foreground/80 flex items-start gap-2">
-            <Users className="w-4 h-4 text-edu-blue shrink-0 mt-0.5" />
-            <p>
-              Events you add here go to <strong>parents of {primaryClass.name}</strong> only.
-              School-wide and stage-wide events (visible below) come from the
-              principal — those you can read but not edit.
-            </p>
-          </CardContent>
-        </Card>
+        <div
+          style={{
+            position: "relative",
+            overflow: "hidden",
+            borderRadius: 18,
+            padding: "12px 14px",
+            background: "linear-gradient(135deg, #DCEEFF 0%, #F5FAFF 100%)",
+            boxShadow: PILLOW,
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+          }}
+        >
+          <DotScribbles color={SKY} />
+          <span
+            style={{
+              position: "relative",
+              zIndex: 1,
+              width: 32,
+              height: 32,
+              borderRadius: 12,
+              background: `linear-gradient(135deg, ${SKY}, #0284C7)`,
+              color: "#fff",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              flexShrink: 0,
+              transform: "rotate(-6deg)",
+              boxShadow: `0 6px 14px ${SKY}55`,
+            }}
+            aria-hidden
+          >
+            <Users size={15} strokeWidth={2.4} />
+          </span>
+          <p
+            style={{
+              position: "relative",
+              zIndex: 1,
+              fontSize: 12,
+              fontWeight: 600,
+              color: "#0F172A",
+              lineHeight: 1.5,
+            }}
+          >
+            Events you add go to{" "}
+            <strong style={{ color: SKY }}>parents of {primaryClass.name}</strong>{" "}
+            only. School + stage events below are from the principal — read-only.
+          </p>
+        </div>
 
         {/* List */}
         {loading ? (
-          <div className="text-sm text-muted-foreground text-center py-8">
-            <Loader2 className="w-5 h-5 animate-spin mx-auto mb-2" />
-            Loading events…
-          </div>
+          <CenteredLoader label="Loading events…" />
         ) : filtered.length === 0 ? (
           <EmptyState
-            onCompose={openNew}
             hasEvents={events.length > 0}
             tab={tab}
+            onCompose={openNew}
           />
         ) : (
           <ul
-            className={cn(
-              isDesktop ? "grid grid-cols-2 xl:grid-cols-3 gap-3" : "space-y-2"
-            )}
+            style={{
+              display: "grid",
+              gridTemplateColumns: cardCols,
+              gap: 12,
+              padding: 0,
+              margin: 0,
+              listStyle: "none",
+            }}
           >
             {filtered.map((e) => (
-              <EventCard
-                key={e.id}
-                event={e}
-                myUid={myUid}
-                onEdit={() => openEdit(e)}
-                onDelete={() => handleDelete(e)}
-              />
+              <li key={e.id}>
+                <EventCard
+                  event={e}
+                  myUid={myUid}
+                  onEdit={() => openEdit(e)}
+                  onDelete={() => handleDelete(e)}
+                />
+              </li>
             ))}
           </ul>
         )}
       </div>
 
-      {/* Composer dialog */}
       {dialogOpen && (
         <ComposerSheet
+          isDesktop={isDesktop}
           form={form}
           setForm={setForm}
           editing={!!editingId}
@@ -505,11 +696,96 @@ export default function Events() {
   );
 }
 
-function Stat({ label, value }: { label: string; value: number }) {
+/* ═══════════════════════ building blocks ═══════════════════════ */
+
+function CenteredLoader({ label }: { label: string }) {
   return (
-    <div>
-      <p className="text-2xl font-black leading-none">{value}</p>
-      <p className="text-[10px] uppercase tracking-widest font-bold text-white/70 mt-1">
+    <div
+      style={{
+        padding: "48px 16px",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        gap: 12,
+        color: "#64748B",
+      }}
+    >
+      <Loader2 className="animate-spin" />
+      <p style={{ fontSize: 12, fontWeight: 600 }}>{label}</p>
+    </div>
+  );
+}
+
+function CounterCard({
+  label,
+  value,
+  emoji,
+  tone,
+  surface,
+}: {
+  label: string;
+  value: number;
+  emoji: string;
+  tone: string;
+  surface: string;
+}) {
+  return (
+    <div
+      style={{
+        position: "relative",
+        overflow: "hidden",
+        borderRadius: 22,
+        padding: "12px 12px 10px",
+        background: surface,
+        boxShadow: PILLOW,
+      }}
+    >
+      <DotScribbles color={tone} />
+      <div
+        style={{
+          display: "flex",
+          alignItems: "baseline",
+          justifyContent: "space-between",
+          position: "relative",
+          zIndex: 1,
+        }}
+      >
+        <span
+          style={{
+            fontSize: 28,
+            fontWeight: 900,
+            letterSpacing: "-1.2px",
+            color: tone,
+            lineHeight: 1,
+          }}
+        >
+          {value}
+        </span>
+        <span
+          style={{
+            fontSize: 20,
+            lineHeight: 1,
+            transform: "rotate(8deg)",
+            filter: "drop-shadow(0 3px 6px rgba(0,0,0,0.08))",
+          }}
+          aria-hidden
+        >
+          {emoji}
+        </span>
+      </div>
+      <p
+        style={{
+          fontSize: 10,
+          fontWeight: 800,
+          letterSpacing: "0.12em",
+          textTransform: "uppercase",
+          color: tone,
+          opacity: 0.75,
+          marginTop: 6,
+          position: "relative",
+          zIndex: 1,
+        }}
+      >
         {label}
       </p>
     </div>
@@ -521,33 +797,187 @@ function TabBtn({
   onClick,
   label,
   count,
+  tone,
 }: {
   active: boolean;
   onClick: () => void;
   label: string;
   count: number;
+  tone: string;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className={cn(
-        "flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-bold transition",
-        active ? "bg-white text-edu-navy shadow-sm" : "text-muted-foreground"
-      )}
+      style={{
+        padding: "10px 14px",
+        borderRadius: 12,
+        background: active ? "#fff" : "transparent",
+        color: active ? NAVY : "#64748B",
+        fontSize: 12,
+        fontWeight: 800,
+        border: "none",
+        cursor: "pointer",
+        boxShadow: active ? "0 2px 8px rgba(15,23,42,0.08)" : "none",
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 6,
+        transition: "all 160ms ease",
+      }}
     >
-      <span>{label}</span>
+      {label}
       {count > 0 && (
         <span
-          className={cn(
-            "px-1.5 rounded-full text-[10px] font-black leading-none py-0.5",
-            active ? "bg-edu-light-blue text-edu-blue" : "bg-white"
-          )}
+          style={{
+            fontSize: 10,
+            fontWeight: 900,
+            padding: "2px 7px",
+            borderRadius: 999,
+            background: active ? `${tone}1f` : "#fff",
+            color: active ? tone : "#64748B",
+          }}
         >
           {count}
         </span>
       )}
     </button>
+  );
+}
+
+function SearchPillow({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  return (
+    <div
+      style={{
+        position: "relative",
+        borderRadius: 22,
+        background: "#fff",
+        boxShadow: PILLOW,
+        padding: "4px 4px 4px 14px",
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+      }}
+    >
+      <Search size={16} color="#94A3B8" strokeWidth={2.4} />
+      <input
+        placeholder="Search events…"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        style={{
+          flex: 1,
+          background: "transparent",
+          border: "none",
+          outline: "none",
+          fontSize: 14,
+          fontWeight: 600,
+          color: "#0F172A",
+          padding: "12px 8px",
+          minWidth: 0,
+        }}
+      />
+      {value && (
+        <button
+          type="button"
+          onClick={() => onChange("")}
+          style={{
+            width: 32,
+            height: 32,
+            borderRadius: 999,
+            background: "#F1F5F9",
+            border: "none",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            cursor: "pointer",
+            flexShrink: 0,
+            marginRight: 4,
+          }}
+        >
+          <X size={14} color="#64748B" strokeWidth={2.4} />
+        </button>
+      )}
+    </div>
+  );
+}
+
+function EmptyState({
+  hasEvents,
+  tab,
+  onCompose,
+}: {
+  hasEvents: boolean;
+  tab: "upcoming" | "past";
+  onCompose: () => void;
+}) {
+  return (
+    <div
+      style={{
+        textAlign: "center",
+        padding: "40px 16px",
+        borderRadius: 22,
+        background: "#fff",
+        boxShadow: PILLOW,
+      }}
+    >
+      <p style={{ fontSize: 40, marginBottom: 8 }} aria-hidden>
+        {!hasEvents ? "📅" : tab === "upcoming" ? "🌤️" : "📚"}
+      </p>
+      <p style={{ fontSize: 15, fontWeight: 800, color: NAVY }}>
+        {!hasEvents
+          ? "No class events yet"
+          : tab === "upcoming"
+          ? "Nothing upcoming"
+          : "No past events"}
+      </p>
+      <p
+        style={{
+          fontSize: 12,
+          color: "#64748B",
+          marginTop: 6,
+          maxWidth: 280,
+          margin: "6px auto 0",
+          lineHeight: 1.5,
+        }}
+      >
+        {!hasEvents
+          ? "Add your first event — parents see it instantly in their Calendar."
+          : tab === "upcoming"
+          ? "Add an event to give parents a heads-up about what's coming."
+          : "Past events will show here once they happen."}
+      </p>
+      {!hasEvents && (
+        <button
+          type="button"
+          onClick={onCompose}
+          style={{
+            marginTop: 14,
+            padding: "10px 18px",
+            borderRadius: 14,
+            background: `linear-gradient(135deg, ${BLUSH}, #DB2777)`,
+            color: "#fff",
+            fontSize: 12,
+            fontWeight: 800,
+            border: "none",
+            cursor: "pointer",
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 6,
+            boxShadow: `0 8px 18px -6px ${BLUSH}88`,
+          }}
+          className="active:scale-95 hover:-translate-y-0.5 transition"
+        >
+          <Plus size={14} strokeWidth={2.6} />
+          Add first event
+        </button>
+      )}
+    </div>
   );
 }
 
@@ -564,174 +994,325 @@ function EventCard({
 }) {
   const start = parseISO(event.startDate);
   const end = event.endDate ? parseISO(event.endDate) : null;
-  const multiDay = end && event.endDate && event.endDate !== event.startDate;
+  const multiDay = !!(end && event.endDate && event.endDate !== event.startDate);
   const typeMeta = TYPES.find((t) => t.key === event.type) || TYPES[0];
+  const tt = TYPE_TONE[event.type];
+  const audMeta = AUDIENCE_META[event.audience];
   const daysOut = differenceInCalendarDays(start, new Date());
   const mine = event.createdBy === myUid;
 
   let timeStr = "";
   if (event.allDay) timeStr = "All day";
-  else if (event.startTime && event.endTime) timeStr = `${event.startTime} – ${event.endTime}`;
+  else if (event.startTime && event.endTime)
+    timeStr = `${event.startTime} – ${event.endTime}`;
   else if (event.startTime) timeStr = event.startTime;
 
   return (
-    <li
-      className={cn(
-        "rounded-2xl border-2 p-4 bg-white transition",
-        mine ? "border-edu-blue/30" : "border-border"
-      )}
+    <div
+      style={{
+        position: "relative",
+        overflow: "hidden",
+        borderRadius: 22,
+        padding: 14,
+        background: tt.surface,
+        boxShadow: PILLOW,
+        borderLeft: `5px solid ${tt.tone}`,
+        display: "flex",
+        flexDirection: "column",
+        gap: 10,
+      }}
     >
-      <div className="flex items-start gap-3">
+      <DotScribbles color={tt.tone} />
+
+      <div
+        style={{
+          position: "relative",
+          zIndex: 1,
+          display: "flex",
+          alignItems: "flex-start",
+          gap: 12,
+        }}
+      >
         {/* Date block */}
-        <div className="shrink-0 text-center rounded-xl bg-edu-light-blue/30 border border-edu-blue/20 px-2 py-1.5 min-w-[52px]">
-          <p className="text-[9px] uppercase font-black tracking-widest text-edu-blue">
+        <div
+          style={{
+            flexShrink: 0,
+            minWidth: 56,
+            textAlign: "center",
+            borderRadius: 14,
+            padding: "8px 6px",
+            background: "#fff",
+            boxShadow: `inset 0 0 0 1px ${tt.tone}33, 0 4px 10px ${tt.tone}1f`,
+          }}
+        >
+          <p
+            style={{
+              fontSize: 9,
+              fontWeight: 900,
+              letterSpacing: "0.14em",
+              textTransform: "uppercase",
+              color: tt.tone,
+            }}
+          >
             {format(start, "MMM")}
           </p>
-          <p className="text-xl font-black text-edu-navy leading-none mt-0.5">
+          <p
+            style={{
+              fontSize: 22,
+              fontWeight: 900,
+              color: NAVY,
+              lineHeight: 1,
+              marginTop: 2,
+              letterSpacing: "-1px",
+            }}
+          >
             {format(start, "d")}
           </p>
-          {multiDay && (
-            <p className="text-[9px] font-bold text-muted-foreground mt-0.5">
-              –{format(end!, "d")}
+          {multiDay && end && (
+            <p
+              style={{
+                fontSize: 9,
+                fontWeight: 800,
+                color: "#64748B",
+                marginTop: 2,
+              }}
+            >
+              –{format(end, "d")}
             </p>
           )}
         </div>
 
-        <div className="flex-1 min-w-0">
-          <div className="flex items-start gap-2">
-            <span className="text-lg leading-none mt-0.5">
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: "flex", alignItems: "flex-start", gap: 6 }}>
+            <span
+              aria-hidden
+              style={{
+                fontSize: 18,
+                transform: "rotate(-6deg)",
+                display: "inline-block",
+                lineHeight: 1,
+                marginTop: 2,
+              }}
+            >
               {typeMeta.emoji}
             </span>
-            <p className="font-black text-edu-navy text-sm leading-tight flex-1">
+            <p
+              style={{
+                fontSize: 14,
+                fontWeight: 800,
+                color: NAVY,
+                letterSpacing: "-0.2px",
+                flex: 1,
+                lineHeight: 1.25,
+              }}
+            >
               {event.title}
             </p>
           </div>
 
-          <div className="flex items-center gap-2 mt-1 flex-wrap">
-            <span className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground">
+          <div
+            style={{
+              display: "flex",
+              gap: 6,
+              flexWrap: "wrap",
+              marginTop: 8,
+              alignItems: "center",
+            }}
+          >
+            <span
+              style={{
+                fontSize: 9,
+                fontWeight: 900,
+                letterSpacing: "0.08em",
+                textTransform: "uppercase",
+                color: "#fff",
+                background: `linear-gradient(135deg, ${tt.tone}, ${tt.tone}cc)`,
+                padding: "3px 8px",
+                borderRadius: 999,
+                boxShadow: `0 3px 8px ${tt.tone}44`,
+              }}
+            >
               {typeMeta.label}
             </span>
-            <span className="text-[10px] text-muted-foreground">·</span>
             <span
-              className={cn(
-                "text-[10px] font-bold rounded px-1.5 py-0.5",
-                event.audience === "class"
-                  ? "bg-edu-light-blue text-edu-blue"
-                  : event.audience === "stage"
-                  ? "bg-edu-light-green text-edu-green"
-                  : "bg-edu-light-pink text-edu-pink"
-              )}
+              style={{
+                fontSize: 9,
+                fontWeight: 800,
+                letterSpacing: "0.06em",
+                textTransform: "uppercase",
+                color: audMeta.tone,
+                background: "#fff",
+                padding: "3px 8px",
+                borderRadius: 999,
+                boxShadow: `inset 0 0 0 1px ${audMeta.tone}55`,
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 4,
+              }}
             >
-              {event.audience === "class"
-                ? "Your class"
-                : event.audience === "stage"
-                ? "Pre-Primary"
-                : "School-wide"}
+              {audMeta.emoji} {audMeta.label}
             </span>
             {daysOut >= 0 && daysOut <= 7 && (
-              <span className="text-[10px] font-bold text-edu-blue bg-edu-light-blue px-1.5 py-0.5 rounded">
-                {daysOut === 0 ? "Today" : daysOut === 1 ? "Tomorrow" : `In ${daysOut}d`}
+              <span
+                style={{
+                  fontSize: 9,
+                  fontWeight: 900,
+                  letterSpacing: "0.06em",
+                  textTransform: "uppercase",
+                  color: "#fff",
+                  background: `linear-gradient(135deg, ${BUTTER}, ${PEACH})`,
+                  padding: "3px 8px",
+                  borderRadius: 999,
+                  boxShadow: `0 3px 8px ${BUTTER}44`,
+                  transform: "rotate(2deg)",
+                }}
+              >
+                {daysOut === 0
+                  ? "🔥 Today"
+                  : daysOut === 1
+                  ? "Tomorrow"
+                  : `In ${daysOut}d`}
               </span>
             )}
           </div>
 
+          {/* Description */}
           {event.description && (
-            <p className="text-xs text-foreground/80 leading-relaxed mt-2 whitespace-pre-wrap line-clamp-3">
+            <p
+              style={{
+                fontSize: 12,
+                color: "#0F172A",
+                lineHeight: 1.55,
+                marginTop: 8,
+                whiteSpace: "pre-wrap",
+                display: "-webkit-box",
+                WebkitLineClamp: 3,
+                WebkitBoxOrient: "vertical",
+                overflow: "hidden",
+              }}
+            >
               {event.description}
             </p>
           )}
 
-          <div className="flex items-center gap-3 mt-2 flex-wrap">
+          {/* Time + location */}
+          <div
+            style={{
+              display: "flex",
+              gap: 10,
+              marginTop: 8,
+              flexWrap: "wrap",
+            }}
+          >
             {timeStr && (
-              <span className="text-[10px] font-semibold text-muted-foreground flex items-center gap-1">
-                <Clock className="w-3 h-3" /> {timeStr}
+              <span
+                style={{
+                  fontSize: 10,
+                  fontWeight: 700,
+                  color: "#64748B",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 4,
+                }}
+              >
+                <Clock size={11} strokeWidth={2.4} />
+                {timeStr}
               </span>
             )}
             {event.location && (
-              <span className="text-[10px] font-semibold text-muted-foreground flex items-center gap-1">
-                <MapPin className="w-3 h-3" /> {event.location}
+              <span
+                style={{
+                  fontSize: 10,
+                  fontWeight: 700,
+                  color: "#64748B",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 4,
+                }}
+              >
+                <MapPin size={11} strokeWidth={2.4} />
+                {event.location}
               </span>
             )}
           </div>
         </div>
       </div>
 
-      <div className="flex items-center justify-between mt-3 pt-3 border-t border-border text-[10px] text-muted-foreground">
-        <span className="font-semibold">
+      {/* Footer */}
+      <div
+        style={{
+          position: "relative",
+          zIndex: 1,
+          paddingTop: 8,
+          borderTop: "1px dashed rgba(15,23,42,0.12)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 8,
+        }}
+      >
+        <span style={{ fontSize: 10, fontWeight: 700, color: "#64748B" }}>
           {mine ? (
-            <span className="text-edu-blue">By you</span>
+            <span style={{ color: BLUSH }}>✍️ By you</span>
           ) : (
-            <>By {event.createdByName || "Principal"}</>
+            <>— {event.createdByName || "Principal"}</>
           )}
         </span>
         {mine && (
-          <div className="flex items-center gap-1">
-            <button
-              type="button"
-              onClick={onEdit}
-              className="w-7 h-7 rounded-lg hover:bg-secondary flex items-center justify-center"
-              title="Edit"
-            >
-              <Pencil className="w-3.5 h-3.5 text-muted-foreground" />
-            </button>
-            <button
-              type="button"
-              onClick={onDelete}
-              className="w-7 h-7 rounded-lg hover:bg-edu-light-red flex items-center justify-center"
-              title="Delete"
-            >
-              <Trash2 className="w-3.5 h-3.5 text-edu-red" />
-            </button>
+          <div style={{ display: "flex", gap: 4 }}>
+            <IconButton tone={SKY} onClick={onEdit} title="Edit">
+              <Pencil size={13} strokeWidth={2.4} />
+            </IconButton>
+            <IconButton tone={RED} onClick={onDelete} title="Delete">
+              <Trash2 size={13} strokeWidth={2.4} />
+            </IconButton>
           </div>
         )}
       </div>
-    </li>
+    </div>
   );
 }
 
-function EmptyState({
-  onCompose,
-  hasEvents,
-  tab,
+function IconButton({
+  tone,
+  onClick,
+  title,
+  children,
 }: {
-  onCompose: () => void;
-  hasEvents: boolean;
-  tab: "upcoming" | "past";
+  tone: string;
+  onClick: () => void;
+  title: string;
+  children: React.ReactNode;
 }) {
   return (
-    <Card>
-      <CardContent className="p-10 text-center">
-        <p className="text-5xl mb-3">📅</p>
-        <p className="text-base font-black text-edu-navy">
-          {!hasEvents
-            ? "No class events yet"
-            : tab === "upcoming"
-            ? "Nothing upcoming"
-            : "No past events"}
-        </p>
-        <p className="text-xs text-muted-foreground mt-2 max-w-xs mx-auto">
-          {!hasEvents
-            ? "Add your first event — parents see it instantly in their Calendar."
-            : tab === "upcoming"
-            ? "Add an event to give parents a heads-up about what's coming."
-            : "Past events will show here once they happen."}
-        </p>
-        {!hasEvents && (
-          <button
-            type="button"
-            onClick={onCompose}
-            className="mt-4 h-10 px-5 rounded-xl bg-edu-navy text-white font-bold text-sm inline-flex items-center gap-1.5 active:scale-95"
-          >
-            <Plus className="w-4 h-4" />
-            Add first event
-          </button>
-        )}
-      </CardContent>
-    </Card>
+    <button
+      type="button"
+      onClick={onClick}
+      title={title}
+      style={{
+        width: 28,
+        height: 28,
+        borderRadius: 999,
+        background: "#fff",
+        color: tone,
+        border: "none",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        cursor: "pointer",
+        boxShadow: `inset 0 0 0 1px ${tone}33`,
+      }}
+      className="active:scale-90 hover:-translate-y-0.5 transition"
+    >
+      {children}
+    </button>
   );
 }
 
+/* ═══════════════════════ Composer sheet ═══════════════════════ */
+
 function ComposerSheet({
+  isDesktop,
   form,
   setForm,
   editing,
@@ -740,6 +1321,7 @@ function ComposerSheet({
   onClose,
   onSave,
 }: {
+  isDesktop: boolean;
   form: FormState;
   setForm: (f: FormState) => void;
   editing: boolean;
@@ -750,196 +1332,546 @@ function ComposerSheet({
 }) {
   return (
     <div
-      className="fixed inset-0 z-[60] bg-black/50 backdrop-blur-sm flex items-end lg:items-center justify-center animate-fade-in"
       onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 60,
+        background: "rgba(15,23,42,0.5)",
+        backdropFilter: "blur(4px)",
+        WebkitBackdropFilter: "blur(4px)",
+        display: "flex",
+        alignItems: isDesktop ? "center" : "flex-end",
+        justifyContent: "center",
+        animation: "fade-in 200ms ease-out",
+      }}
     >
       <div
-        className={cn(
-          "bg-white shadow-2xl overflow-y-auto",
-          "w-full max-w-md max-h-[92vh]",
-          "rounded-t-3xl lg:rounded-2xl lg:max-w-lg",
-          "animate-slide-up lg:animate-fade-in"
-        )}
         onClick={(e) => e.stopPropagation()}
-        style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+        style={{
+          width: "100%",
+          maxWidth: isDesktop ? 560 : 480,
+          maxHeight: isDesktop ? "92vh" : "94vh",
+          overflowY: "auto",
+          background:
+            "linear-gradient(180deg, #FFF4F8 0%, #FFFFFF 28%, #FFFFFF 100%)",
+          borderRadius: isDesktop ? 28 : "28px 28px 0 0",
+          boxShadow: "0 -20px 60px rgba(15,23,42,0.18)",
+          animation: "slide-up 240ms cubic-bezier(.34,1.56,.64,1)",
+          position: "relative",
+          margin: isDesktop ? "0 16px" : 0,
+          paddingBottom: "env(safe-area-inset-bottom)",
+        }}
       >
-        <div className="lg:hidden w-12 h-1.5 bg-border rounded-full mx-auto mt-2.5 mb-1" />
-
-        <div className="px-5 pt-3 pb-2 flex items-start justify-between">
-          <div>
-            <p className="text-lg font-black text-edu-navy">
-              {editing ? "Edit Event" : "New Event"}
-            </p>
-            <p className="text-[11px] text-muted-foreground mt-0.5 flex items-center gap-1">
-              <Users className="w-3 h-3" />
-              Shows on <strong>{className}</strong> parents' Calendar
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="w-9 h-9 rounded-full hover:bg-secondary flex items-center justify-center"
-            aria-label="Close"
+        {/* Sticky header */}
+        <div
+          style={{
+            position: "sticky",
+            top: 0,
+            background:
+              "linear-gradient(180deg, rgba(255,244,248,0.95) 0%, rgba(255,255,255,0.85) 100%)",
+            backdropFilter: "blur(10px)",
+            WebkitBackdropFilter: "blur(10px)",
+            padding: isDesktop ? "16px 22px 14px" : "10px 18px 12px",
+            borderRadius: isDesktop ? "28px 28px 0 0" : "28px 28px 0 0",
+            zIndex: 10,
+          }}
+        >
+          {!isDesktop && (
+            <div
+              style={{
+                width: 48,
+                height: 5,
+                borderRadius: 999,
+                background: "#E2E8F0",
+                margin: "0 auto 12px",
+              }}
+            />
+          )}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "flex-start",
+              justifyContent: "space-between",
+              gap: 12,
+            }}
           >
-            <X className="w-4 h-4" />
-          </button>
+            <div>
+              <p
+                style={{
+                  fontSize: 10,
+                  fontWeight: 800,
+                  letterSpacing: "0.16em",
+                  textTransform: "uppercase",
+                  color: BLUSH,
+                  opacity: 0.85,
+                }}
+              >
+                {editing ? "Edit event" : "New event"}
+              </p>
+              <p
+                style={{
+                  fontSize: 20,
+                  fontWeight: 800,
+                  color: NAVY,
+                  marginTop: 2,
+                  letterSpacing: "-0.4px",
+                }}
+              >
+                {editing ? "Update Event" : "Compose Event"}{" "}
+                <span
+                  aria-hidden
+                  style={{
+                    display: "inline-block",
+                    transform: "rotate(-6deg)",
+                  }}
+                >
+                  🎉
+                </span>
+              </p>
+              <p
+                style={{
+                  fontSize: 11,
+                  fontWeight: 600,
+                  color: "#64748B",
+                  marginTop: 4,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 4,
+                }}
+              >
+                <CalendarIcon size={11} strokeWidth={2.4} />
+                Shows on <strong style={{ color: BLUSH }}>{className}</strong>{" "}
+                parents' Calendar
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close"
+              style={{
+                width: 34,
+                height: 34,
+                borderRadius: 999,
+                background: "#F1F5F9",
+                border: "none",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                cursor: "pointer",
+                flexShrink: 0,
+              }}
+            >
+              <X size={16} color="#64748B" strokeWidth={2.4} />
+            </button>
+          </div>
         </div>
 
-        <div className="px-5 mt-3 space-y-4">
+        <div
+          style={{
+            padding: isDesktop ? "16px 22px 24px" : "12px 18px 24px",
+            display: "flex",
+            flexDirection: "column",
+            gap: 14,
+          }}
+        >
           {/* Title */}
-          <Field label="Title">
-            <Input
+          <div>
+            <FieldLabel emoji="🏷️">Title</FieldLabel>
+            <PillowInput
               value={form.title}
-              onChange={(e) => setForm({ ...form, title: e.target.value })}
+              onChange={(v) => setForm({ ...form, title: v })}
               placeholder="e.g. Annual Day rehearsal"
               maxLength={120}
             />
-          </Field>
-
-          {/* Type */}
-          <Field label="Type">
-            <div className="grid grid-cols-3 gap-2">
-              {TYPES.map((t) => (
-                <button
-                  key={t.key}
-                  type="button"
-                  onClick={() => setForm({ ...form, type: t.key })}
-                  className={cn(
-                    "rounded-xl border-2 p-2 text-center transition active:scale-95",
-                    form.type === t.key
-                      ? "border-edu-navy bg-edu-navy/5"
-                      : "border-border hover:border-foreground/30"
-                  )}
-                >
-                  <div className="text-lg leading-none">{t.emoji}</div>
-                  <div className="text-[9px] font-bold mt-0.5 text-muted-foreground uppercase tracking-wider">
-                    {t.label}
-                  </div>
-                </button>
-              ))}
-            </div>
-          </Field>
-
-          {/* Dates */}
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Start date">
-              <Input
-                type="date"
-                value={form.startDate}
-                onChange={(e) => setForm({ ...form, startDate: e.target.value })}
-              />
-            </Field>
-            <Field label="End date (optional)">
-              <Input
-                type="date"
-                value={form.endDate}
-                onChange={(e) => setForm({ ...form, endDate: e.target.value })}
-                min={form.startDate}
-              />
-            </Field>
           </div>
 
-          {/* All-day toggle + times */}
-          <label className="flex items-center gap-2 rounded-xl border border-border p-3 cursor-pointer">
+          {/* Type tiles */}
+          <div>
+            <FieldLabel emoji="🎯">Type</FieldLabel>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+                gap: 6,
+              }}
+            >
+              {TYPES.map((t) => {
+                const tt = TYPE_TONE[t.key];
+                const selected = form.type === t.key;
+                return (
+                  <button
+                    key={t.key}
+                    type="button"
+                    onClick={() => setForm({ ...form, type: t.key })}
+                    style={{
+                      position: "relative",
+                      overflow: "hidden",
+                      padding: "12px 6px",
+                      borderRadius: 16,
+                      background: selected ? tt.surface : "#fff",
+                      border: "none",
+                      cursor: "pointer",
+                      boxShadow: selected
+                        ? `inset 0 0 0 2px ${tt.tone}, ${PILLOW}`
+                        : PILLOW,
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      gap: 4,
+                      transition: "transform 140ms ease",
+                    }}
+                    className="active:scale-95"
+                  >
+                    <span
+                      style={{
+                        fontSize: 22,
+                        transform: selected ? "rotate(-8deg)" : "none",
+                        transition: "transform 200ms ease",
+                      }}
+                      aria-hidden
+                    >
+                      {t.emoji}
+                    </span>
+                    <span
+                      style={{
+                        fontSize: 10,
+                        fontWeight: 800,
+                        letterSpacing: "0.04em",
+                        color: selected ? tt.tone : "#475569",
+                        textAlign: "center",
+                        lineHeight: 1.2,
+                      }}
+                    >
+                      {t.label}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Dates */}
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr",
+              gap: 8,
+            }}
+          >
+            <div>
+              <FieldLabel emoji="📅">Start date</FieldLabel>
+              <PillowInput
+                type="date"
+                value={form.startDate}
+                onChange={(v) => setForm({ ...form, startDate: v })}
+              />
+            </div>
+            <div>
+              <FieldLabel emoji="🏁">End date (opt)</FieldLabel>
+              <PillowInput
+                type="date"
+                value={form.endDate}
+                onChange={(v) => setForm({ ...form, endDate: v })}
+                min={form.startDate}
+              />
+            </div>
+          </div>
+
+          {/* All-day toggle */}
+          <label
+            style={{
+              position: "relative",
+              overflow: "hidden",
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+              padding: 12,
+              borderRadius: 16,
+              background: form.allDay
+                ? "linear-gradient(135deg, #DCEEFF 0%, #F5FAFF 100%)"
+                : "#fff",
+              boxShadow: form.allDay
+                ? `inset 0 0 0 2px ${SKY}, ${PILLOW}`
+                : PILLOW,
+              cursor: "pointer",
+            }}
+          >
+            {form.allDay && <DotScribbles color={SKY} />}
             <input
               type="checkbox"
               checked={form.allDay}
               onChange={(e) => setForm({ ...form, allDay: e.target.checked })}
-              className="w-4 h-4"
+              style={{
+                width: 16,
+                height: 16,
+                accentColor: SKY,
+                cursor: "pointer",
+                position: "relative",
+                zIndex: 1,
+              }}
             />
-            <div className="flex-1">
-              <p className="text-xs font-bold text-edu-navy">All-day event</p>
-              <p className="text-[10px] text-muted-foreground">
-                Uncheck to set specific times
+            <div style={{ position: "relative", zIndex: 1, minWidth: 0 }}>
+              <p
+                style={{
+                  fontSize: 12,
+                  fontWeight: 800,
+                  color: form.allDay ? SKY : NAVY,
+                }}
+              >
+                🌞 All-day event
+              </p>
+              <p style={{ fontSize: 10, color: "#64748B", marginTop: 2 }}>
+                Uncheck to set specific start/end times
               </p>
             </div>
           </label>
+
+          {/* Times (only when not all-day) */}
           {!form.allDay && (
-            <div className="grid grid-cols-2 gap-3">
-              <Field label="Start time">
-                <Input
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
+                gap: 8,
+              }}
+            >
+              <div>
+                <FieldLabel emoji="🕐">Start time</FieldLabel>
+                <PillowInput
                   type="time"
                   value={form.startTime}
-                  onChange={(e) =>
-                    setForm({ ...form, startTime: e.target.value })
-                  }
+                  onChange={(v) => setForm({ ...form, startTime: v })}
                 />
-              </Field>
-              <Field label="End time">
-                <Input
+              </div>
+              <div>
+                <FieldLabel emoji="🕔">End time</FieldLabel>
+                <PillowInput
                   type="time"
                   value={form.endTime}
-                  onChange={(e) => setForm({ ...form, endTime: e.target.value })}
+                  onChange={(v) => setForm({ ...form, endTime: v })}
                 />
-              </Field>
+              </div>
             </div>
           )}
 
           {/* Location */}
-          <Field label="Location (optional)">
-            <Input
+          <div>
+            <FieldLabel emoji="📍">Location (optional)</FieldLabel>
+            <PillowInput
               value={form.location}
-              onChange={(e) => setForm({ ...form, location: e.target.value })}
+              onChange={(v) => setForm({ ...form, location: v })}
               placeholder="e.g. Playground, Main Hall, Park entrance"
               maxLength={100}
             />
-          </Field>
+          </div>
 
           {/* Description */}
-          <Field label="Description (optional)">
+          <div>
+            <FieldLabel emoji="📝">Description (optional)</FieldLabel>
             <textarea
               value={form.description}
               onChange={(e) => setForm({ ...form, description: e.target.value })}
               placeholder="What parents need to know — what to pack, dress code, drop-off plans"
               rows={3}
               maxLength={1000}
-              className="w-full rounded-xl border border-border px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-edu-blue/30"
+              style={{
+                width: "100%",
+                padding: "12px 14px",
+                borderRadius: 16,
+                background: "#fff",
+                border: "none",
+                fontSize: 13,
+                fontWeight: 500,
+                color: "#0F172A",
+                outline: "none",
+                resize: "none",
+                boxShadow: PILLOW,
+                fontFamily: "inherit",
+                lineHeight: 1.55,
+              }}
             />
-          </Field>
-        </div>
+          </div>
 
-        <div className="px-5 mt-5 pb-5 flex gap-2 justify-end">
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={saving}
-            className="h-10 px-4 rounded-xl border border-border text-sm font-bold hover:bg-secondary"
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            onClick={onSave}
-            disabled={saving}
-            className="h-10 px-5 rounded-xl bg-edu-navy text-white font-bold text-sm flex items-center gap-1.5 active:scale-95 disabled:opacity-50"
-          >
-            {saving ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : editing ? (
-              "Save changes"
-            ) : (
-              "Add to Calendar"
-            )}
-          </button>
+          {/* Buttons */}
+          <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={saving}
+              style={{
+                padding: "12px 18px",
+                borderRadius: 16,
+                background: "#fff",
+                color: "#64748B",
+                fontSize: 13,
+                fontWeight: 800,
+                border: "none",
+                cursor: saving ? "default" : "pointer",
+                boxShadow: PILLOW,
+                opacity: saving ? 0.6 : 1,
+              }}
+              className="active:scale-95 hover:-translate-y-0.5 transition"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={onSave}
+              disabled={saving}
+              style={{
+                flex: 1,
+                padding: "12px 18px",
+                borderRadius: 16,
+                background: saving
+                  ? "#CBD5E1"
+                  : `linear-gradient(135deg, ${BLUSH}, #DB2777)`,
+                color: "#fff",
+                fontSize: 13,
+                fontWeight: 800,
+                border: "none",
+                cursor: saving ? "default" : "pointer",
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 6,
+                boxShadow: saving ? "none" : `0 10px 24px -6px ${BLUSH}88`,
+              }}
+              className="active:scale-95 hover:-translate-y-0.5 transition"
+            >
+              {saving ? (
+                <Loader2 size={14} className="animate-spin" />
+              ) : (
+                <CalendarIcon size={14} strokeWidth={2.4} />
+              )}
+              {editing ? "Save changes" : "Add to Calendar"}
+            </button>
+          </div>
         </div>
       </div>
     </div>
   );
 }
 
-function Field({
-  label,
+function PillowInput({
+  value,
+  onChange,
+  placeholder,
+  maxLength,
+  type,
+  min,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+  maxLength?: number;
+  type?: string;
+  min?: string;
+}) {
+  return (
+    <input
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      placeholder={placeholder}
+      maxLength={maxLength}
+      type={type}
+      min={min}
+      style={{
+        width: "100%",
+        padding: "12px 14px",
+        borderRadius: 16,
+        background: "#fff",
+        border: "none",
+        fontSize: 13,
+        fontWeight: 600,
+        color: "#0F172A",
+        outline: "none",
+        boxShadow: PILLOW,
+      }}
+    />
+  );
+}
+
+function FieldLabel({
+  emoji,
   children,
 }: {
-  label: string;
+  emoji?: string;
   children: React.ReactNode;
 }) {
   return (
-    <div>
-      <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1 block">
-        {label}
-      </label>
-      {children}
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 6,
+        marginBottom: 8,
+      }}
+    >
+      {emoji && (
+        <span
+          aria-hidden
+          style={{
+            fontSize: 13,
+            transform: "rotate(-6deg)",
+            display: "inline-block",
+          }}
+        >
+          {emoji}
+        </span>
+      )}
+      <p
+        style={{
+          fontSize: 10,
+          fontWeight: 800,
+          letterSpacing: "0.14em",
+          textTransform: "uppercase",
+          color: NAVY,
+          opacity: 0.75,
+        }}
+      >
+        {children}
+      </p>
     </div>
   );
 }
+
+function DotScribbles({
+  color,
+  dense = false,
+}: {
+  color: string;
+  dense?: boolean;
+}) {
+  return (
+    <svg
+      aria-hidden="true"
+      width="100%"
+      height="100%"
+      style={{
+        position: "absolute",
+        inset: 0,
+        opacity: dense ? 0.1 : 0.07,
+        pointerEvents: "none",
+      }}
+    >
+      <circle cx="14%" cy="24%" r="2.5" fill={color} />
+      <circle cx="82%" cy="14%" r="1.8" fill={color} />
+      <circle cx="68%" cy="62%" r="2" fill={color} />
+      <circle cx="22%" cy="80%" r="1.6" fill={color} />
+      <circle cx="48%" cy="32%" r="1.4" fill={color} />
+      {dense && (
+        <>
+          <circle cx="90%" cy="80%" r="2.2" fill={color} />
+          <circle cx="6%" cy="60%" r="1.4" fill={color} />
+          <circle cx="55%" cy="88%" r="1.6" fill={color} />
+        </>
+      )}
+    </svg>
+  );
+}
+
+// Palette constants reserved for future variants on this page.
+void LAV;

@@ -1,14 +1,8 @@
 /**
  * Notices.tsx — Pre-primary teacher's class-scoped notices composer.
- *
- * Teachers write to the same `pp_announcements` collection that the
- * pre-primary-parent-dashboard /announcements page subscribes to, BUT
- * scoped strictly to their assigned class (audience='class', classId =
- * primaryClass.id is FORCED — no audience picker on this surface).
- *
- * Mirrors the principal-dashboard's PreAnnouncements UX so the founder
- * has a single mental model. Distinct mobile + desktop layouts per
- * project policy.
+ * Cartoonified 2026-05-25. Writes to pp_announcements with audience='class'
+ * + classId forced. Teacher sees school/stage/own-class notices but can
+ * only edit/delete/pin notices they posted (createdBy === teacherData.id).
  */
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -23,7 +17,6 @@ import {
   Search,
   X,
   Calendar as CalendarIcon,
-  Sparkles,
 } from "lucide-react";
 import { toast } from "sonner";
 import { format, formatDistanceToNow } from "date-fns";
@@ -45,33 +38,24 @@ import {
 import { useAuth } from "@/lib/AuthContext";
 import { useTeacherClass } from "@/hooks/useTeacherClass";
 import { useIsDesktop } from "@/hooks/useIsDesktop";
-import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { cn } from "@/lib/utils";
 
-// Minimal Label — this dashboard's shadcn setup doesn't ship the Radix
-// Label primitive, so use a plain semantic <label> with the same look.
-function Label({
-  htmlFor,
-  className,
-  children,
-}: {
-  htmlFor?: string;
-  className?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <label
-      htmlFor={htmlFor}
-      className={cn(
-        "text-xs font-bold uppercase tracking-wider text-muted-foreground",
-        className
-      )}
-    >
-      {children}
-    </label>
-  );
-}
+/* ═══════════════════════════════════════════════════════════════════════
+   PRE-PRIMARY TEACHER · CLASS NOTICES
+   Storybook-sherbet noticeboard. Sherbet surface per type, audience pill,
+   pin sticker, principal vs mine vs school-wide visual differentiation.
+   ════════════════════════════════════════════════════════════════════════ */
+
+const NAVY = "#1e3272";
+const MINT = "#10B981";
+const PEACH = "#FB923C";
+const BLUSH = "#EC4899";
+const SKY = "#0EA5E9";
+const LAV = "#A78BFA";
+const BUTTER = "#F59E0B";
+const RED = "#EF4444";
+
+const PILLOW =
+  "0 1px 0 rgba(255,255,255,0.55) inset, 0 14px 32px -10px rgba(30,50,114,0.16), 0 4px 10px rgba(30,50,114,0.06)";
 
 const TYPES = [
   { key: "info", label: "Notice", emoji: "📣" },
@@ -84,12 +68,36 @@ const TYPES = [
 type NoticeType = (typeof TYPES)[number]["key"];
 type Audience = "school" | "stage" | "class";
 
-const TYPE_BG: Record<NoticeType, string> = {
-  info: "bg-edu-light-blue text-edu-blue border-edu-blue/30",
-  event: "bg-edu-light-pink text-edu-pink border-edu-pink/30",
-  alert: "bg-edu-light-red text-edu-red border-edu-red/30",
-  celebration: "bg-edu-light-yellow text-edu-yellow border-edu-yellow/30",
-  reminder: "bg-edu-light-orange text-edu-orange border-edu-orange/30",
+const TYPE_TONE: Record<
+  NoticeType,
+  { tone: string; surface: string }
+> = {
+  info: {
+    tone: SKY,
+    surface: "linear-gradient(135deg, #DCEEFF 0%, #F5FAFF 100%)",
+  },
+  event: {
+    tone: BLUSH,
+    surface: "linear-gradient(135deg, #FFE0EC 0%, #FFF4F8 100%)",
+  },
+  alert: {
+    tone: RED,
+    surface: "linear-gradient(135deg, #FFD6D6 0%, #FFF1F1 100%)",
+  },
+  celebration: {
+    tone: BUTTER,
+    surface: "linear-gradient(135deg, #FFEBC8 0%, #FFF7E5 100%)",
+  },
+  reminder: {
+    tone: PEACH,
+    surface: "linear-gradient(135deg, #FFE0CC 0%, #FFF5EC 100%)",
+  },
+};
+
+const AUDIENCE_META: Record<Audience, { tone: string; label: string; emoji: string }> = {
+  school: { tone: BLUSH, label: "School-wide", emoji: "🏫" },
+  stage: { tone: MINT, label: "All Pre-Primary", emoji: "🌱" },
+  class: { tone: SKY, label: "Your class", emoji: "👶" },
 };
 
 interface NoticeRow {
@@ -142,10 +150,6 @@ export default function Notices() {
   const classId = primaryClass?.id;
   const myUid = teacherData?.id;
 
-  // Subscription scoped to this teacher's class — pulls both notices THIS
-  // teacher posted AND any notices the principal posted for this class.
-  // Reads ALL school-wide notices in too because parents in this class see
-  // them; teacher can preview what their parents are seeing.
   useEffect(() => {
     if (!schoolId) {
       setLoading(false);
@@ -163,9 +167,7 @@ export default function Notices() {
         snap.forEach((d) => {
           const data = d.data() as DocumentData;
           const audience = (data.audience as Audience) || "school";
-          // Filter: school + stage + class-matching-my-class
           if (audience === "class" && data.classId !== classId) return;
-
           rows.push({
             id: d.id,
             schoolId: data.schoolId,
@@ -199,9 +201,7 @@ export default function Notices() {
       (err) => {
         console.error("[Notices] subscription:", err);
         toast.error(
-          `Could not load notices: ${
-            err instanceof Error ? err.message : err
-          }`
+          `Could not load notices: ${err instanceof Error ? err.message : err}`
         );
         setLoading(false);
       }
@@ -209,13 +209,21 @@ export default function Notices() {
     return () => unsub();
   }, [schoolId, classId]);
 
+  useEffect(() => {
+    if (!dialogOpen) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [dialogOpen]);
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return notices;
     return notices.filter(
       (n) =>
-        n.title.toLowerCase().includes(q) ||
-        n.body.toLowerCase().includes(q)
+        n.title.toLowerCase().includes(q) || n.body.toLowerCase().includes(q)
     );
   }, [notices, search]);
 
@@ -285,8 +293,7 @@ export default function Notices() {
         createdByRole: "teacher" as const,
       };
       if (editingId) {
-        const ref = doc(db, "pp_announcements", editingId);
-        await updateDoc(ref, {
+        await updateDoc(doc(db, "pp_announcements", editingId), {
           ...payload,
           updatedAt: serverTimestamp(),
         });
@@ -348,135 +355,268 @@ export default function Notices() {
     }
   };
 
-  if (classLoading) {
-    return (
-      <div className="px-4 py-12 flex flex-col items-center text-muted-foreground gap-3">
-        <Loader2 className="w-6 h-6 animate-spin" />
-        <p className="text-xs">Resolving your class…</p>
-      </div>
-    );
-  }
-
+  if (classLoading) return <CenteredLoader label="Resolving your class…" />;
   if (!primaryClass) {
     return (
-      <div className="px-4 py-12 text-center">
-        <p className="text-sm font-bold text-edu-navy">No class assigned</p>
-        <p className="text-xs text-muted-foreground mt-1">
-          Contact your principal to be added to a class.
+      <div style={{ padding: "48px 16px", textAlign: "center" }}>
+        <p style={{ fontSize: 16, fontWeight: 800, color: NAVY }}>
+          🌱 No class assigned
         </p>
       </div>
     );
   }
 
+  const cardCols = isDesktop ? "repeat(2, minmax(0, 1fr))" : "1fr";
+
   return (
     <>
       <div
-        className={cn(
-          "py-4 space-y-4 animate-fade-in",
-          isDesktop ? "px-6 lg:px-10 max-w-7xl mx-auto" : "px-4"
-        )}
+        className="animate-fade-in"
+        style={{
+          padding: isDesktop ? "24px 28px 80px" : "16px 16px 80px",
+          display: "flex",
+          flexDirection: "column",
+          gap: 16,
+          width: "100%",
+        }}
       >
-        {/* Header */}
-        <div className="flex items-start justify-between gap-3 flex-wrap">
-          <div className="flex items-center gap-2">
-            <div
-              className={cn(
-                "rounded-xl bg-edu-light-blue text-edu-blue flex items-center justify-center",
-                isDesktop ? "w-10 h-10" : "w-9 h-9"
-              )}
+        {/* Hero */}
+        <div
+          style={{
+            position: "relative",
+            overflow: "hidden",
+            borderRadius: 28,
+            padding: isDesktop ? "22px 26px" : "18px 18px",
+            background:
+              "linear-gradient(135deg, #DCEEFF 0%, #F5FAFF 55%, #FFFFFF 100%)",
+            boxShadow: PILLOW,
+          }}
+        >
+          <DotScribbles color={SKY} dense />
+          <div
+            style={{
+              position: "relative",
+              zIndex: 1,
+              display: "flex",
+              alignItems: "center",
+              gap: 14,
+              flexWrap: "wrap",
+            }}
+          >
+            <span
+              style={{
+                width: 52,
+                height: 52,
+                borderRadius: 18,
+                background: `linear-gradient(135deg, ${SKY}, #0284C7)`,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: 26,
+                boxShadow: `0 8px 18px ${SKY}55`,
+                transform: "rotate(-8deg)",
+                flexShrink: 0,
+              }}
+              aria-hidden
             >
-              <Megaphone className={isDesktop ? "w-5 h-5" : "w-4 h-4"} />
-            </div>
-            <div>
-              <h1
-                className={cn(
-                  "font-black text-edu-navy leading-none",
-                  isDesktop ? "text-2xl" : "text-xl"
-                )}
+              📣
+            </span>
+            <div style={{ flex: 1, minWidth: 200 }}>
+              <p
+                style={{
+                  fontSize: 11,
+                  fontWeight: 800,
+                  letterSpacing: "0.16em",
+                  textTransform: "uppercase",
+                  color: SKY,
+                  opacity: 0.9,
+                }}
               >
-                Class Notices
+                Class noticeboard
+              </p>
+              <h1
+                style={{
+                  fontSize: isDesktop ? 26 : 21,
+                  fontWeight: 800,
+                  letterSpacing: "-0.6px",
+                  color: NAVY,
+                  marginTop: 2,
+                }}
+              >
+                Class Notices{" "}
+                <span
+                  aria-hidden
+                  style={{ display: "inline-block", transform: "rotate(6deg)" }}
+                >
+                  📢
+                </span>
               </h1>
-              <p className="text-[11px] text-muted-foreground mt-1 font-semibold flex items-center gap-1">
-                <Users className="w-3 h-3" />
-                {primaryClass.name} ·{" "}
-                {format(new Date(), "EEEE, d MMM")}
+              <p
+                style={{
+                  fontSize: isDesktop ? 13 : 12,
+                  fontWeight: 500,
+                  color: "#64748B",
+                  marginTop: 4,
+                }}
+              >
+                {primaryClass.name} · {format(new Date(), "EEEE, d MMM")}
               </p>
             </div>
+            <button
+              type="button"
+              onClick={openNew}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                padding: "12px 18px",
+                borderRadius: 16,
+                background: `linear-gradient(135deg, ${SKY}, #0284C7)`,
+                color: "#fff",
+                fontSize: 13,
+                fontWeight: 800,
+                border: "none",
+                cursor: "pointer",
+                boxShadow: `0 10px 24px -8px ${SKY}88`,
+              }}
+              className="active:scale-95 hover:-translate-y-0.5 transition"
+            >
+              <Plus size={16} strokeWidth={2.6} />
+              {isDesktop ? "New Notice" : "New"}
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={openNew}
-            className="h-10 px-4 rounded-xl bg-edu-navy text-white font-bold text-sm flex items-center gap-1 active:scale-95"
-          >
-            <Plus className="w-4 h-4" /> New Notice
-          </button>
         </div>
 
-        {/* Stats banner */}
-        <div className="rounded-2xl bg-gradient-to-br from-edu-blue to-edu-navy text-white p-4 shadow-md">
-          <div className="flex items-center gap-2 text-[10px] uppercase tracking-widest text-white/70 font-bold">
-            <Sparkles className="w-3 h-3" /> Overview
-          </div>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-2">
-            <Stat label="Total seen" value={stats.total} />
-            <Stat label="Yours" value={stats.mine} />
-            <Stat label="Active" value={stats.active} />
-            <Stat label="Pinned" value={stats.pinned} />
-          </div>
-        </div>
-
-        {/* Search */}
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input
-            placeholder="Search notices…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-9"
+        {/* 4-stat strip */}
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+            gap: 10,
+          }}
+        >
+          <CounterCard
+            label="Total seen"
+            value={stats.total}
+            emoji="📋"
+            tone={NAVY}
+            surface="linear-gradient(135deg, #E1ECFF 0%, #F7FAFF 100%)"
+          />
+          <CounterCard
+            label="Yours"
+            value={stats.mine}
+            emoji="✍️"
+            tone={SKY}
+            surface="linear-gradient(135deg, #DCEEFF 0%, #F5FAFF 100%)"
+          />
+          <CounterCard
+            label="Active"
+            value={stats.active}
+            emoji="🟢"
+            tone={MINT}
+            surface="linear-gradient(135deg, #D6F5E2 0%, #F1FBF5 100%)"
+          />
+          <CounterCard
+            label="Pinned"
+            value={stats.pinned}
+            emoji="📌"
+            tone={stats.pinned > 0 ? BUTTER : "#94A3B8"}
+            surface={
+              stats.pinned > 0
+                ? "linear-gradient(135deg, #FFEBC8 0%, #FFF7E5 100%)"
+                : "linear-gradient(135deg, #F1F5F9 0%, #FFFFFF 100%)"
+            }
           />
         </div>
 
+        {/* Search */}
+        <SearchPillow value={search} onChange={setSearch} />
+
         {/* Info banner */}
-        <Card className="border-edu-light-blue bg-edu-light-blue/30">
-          <CardContent className="p-3 text-[11px] text-foreground/80 flex items-start gap-2">
-            <Users className="w-4 h-4 text-edu-blue shrink-0 mt-0.5" />
-            <p>
-              Notices you post here go to <strong>parents of {primaryClass.name}</strong> only.
-              School-wide and stage-wide notices (visible below) come from the
-              principal — those you can read but not edit.
-            </p>
-          </CardContent>
-        </Card>
+        <div
+          style={{
+            position: "relative",
+            overflow: "hidden",
+            borderRadius: 18,
+            padding: "12px 14px",
+            background: "linear-gradient(135deg, #DCEEFF 0%, #F5FAFF 100%)",
+            boxShadow: PILLOW,
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+          }}
+        >
+          <DotScribbles color={SKY} />
+          <span
+            style={{
+              position: "relative",
+              zIndex: 1,
+              width: 32,
+              height: 32,
+              borderRadius: 12,
+              background: `linear-gradient(135deg, ${SKY}, #0284C7)`,
+              color: "#fff",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              flexShrink: 0,
+              transform: "rotate(-6deg)",
+              boxShadow: `0 6px 14px ${SKY}55`,
+            }}
+            aria-hidden
+          >
+            <Users size={15} strokeWidth={2.4} />
+          </span>
+          <p
+            style={{
+              position: "relative",
+              zIndex: 1,
+              fontSize: 12,
+              fontWeight: 600,
+              color: "#0F172A",
+              lineHeight: 1.5,
+            }}
+          >
+            Notices you post go to{" "}
+            <strong style={{ color: SKY }}>parents of {primaryClass.name}</strong>{" "}
+            only. School + stage notices below come from the principal — read-only.
+          </p>
+        </div>
 
         {/* List */}
         {loading ? (
-          <div className="text-sm text-muted-foreground text-center py-8">
-            <Loader2 className="w-5 h-5 animate-spin mx-auto mb-2" />
-            Loading notices…
-          </div>
+          <CenteredLoader label="Loading notices…" />
         ) : filtered.length === 0 ? (
-          <EmptyState onCompose={openNew} hasNotices={notices.length > 0} />
+          <EmptyState
+            hasNotices={notices.length > 0}
+            onCompose={openNew}
+          />
         ) : (
           <ul
-            className={cn(
-              isDesktop ? "grid grid-cols-2 xl:grid-cols-3 gap-3" : "space-y-2"
-            )}
+            style={{
+              display: "grid",
+              gridTemplateColumns: cardCols,
+              gap: 12,
+              padding: 0,
+              margin: 0,
+              listStyle: "none",
+            }}
           >
             {filtered.map((n) => (
-              <NoticeCard
-                key={n.id}
-                notice={n}
-                myUid={myUid}
-                onEdit={() => openEdit(n)}
-                onDelete={() => handleDelete(n)}
-                onTogglePin={() => handleTogglePin(n)}
-              />
+              <li key={n.id}>
+                <NoticeCard
+                  notice={n}
+                  myUid={myUid}
+                  onEdit={() => openEdit(n)}
+                  onDelete={() => handleDelete(n)}
+                  onTogglePin={() => handleTogglePin(n)}
+                />
+              </li>
             ))}
           </ul>
         )}
       </div>
 
-      {/* Composer dialog (custom — keeps the teacher's bottom-sheet feel on mobile) */}
       {dialogOpen && (
         <ComposerSheet
           form={form}
@@ -498,13 +638,226 @@ export default function Notices() {
   );
 }
 
-function Stat({ label, value }: { label: string; value: number }) {
+/* ═══════════════════════ building blocks ═══════════════════════ */
+
+function CenteredLoader({ label }: { label: string }) {
   return (
-    <div>
-      <p className="text-2xl font-black leading-none">{value}</p>
-      <p className="text-[10px] uppercase tracking-widest font-bold text-white/70 mt-1">
+    <div
+      style={{
+        padding: "48px 16px",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        gap: 12,
+        color: "#64748B",
+      }}
+    >
+      <Loader2 className="animate-spin" />
+      <p style={{ fontSize: 12, fontWeight: 600 }}>{label}</p>
+    </div>
+  );
+}
+
+function CounterCard({
+  label,
+  value,
+  emoji,
+  tone,
+  surface,
+}: {
+  label: string;
+  value: number;
+  emoji: string;
+  tone: string;
+  surface: string;
+}) {
+  return (
+    <div
+      style={{
+        position: "relative",
+        overflow: "hidden",
+        borderRadius: 22,
+        padding: "12px 12px 10px",
+        background: surface,
+        boxShadow: PILLOW,
+      }}
+    >
+      <DotScribbles color={tone} />
+      <div
+        style={{
+          display: "flex",
+          alignItems: "baseline",
+          justifyContent: "space-between",
+          position: "relative",
+          zIndex: 1,
+        }}
+      >
+        <span
+          style={{
+            fontSize: 28,
+            fontWeight: 900,
+            letterSpacing: "-1.2px",
+            color: tone,
+            lineHeight: 1,
+          }}
+        >
+          {value}
+        </span>
+        <span
+          style={{
+            fontSize: 20,
+            lineHeight: 1,
+            transform: "rotate(8deg)",
+            filter: "drop-shadow(0 3px 6px rgba(0,0,0,0.08))",
+          }}
+          aria-hidden
+        >
+          {emoji}
+        </span>
+      </div>
+      <p
+        style={{
+          fontSize: 10,
+          fontWeight: 800,
+          letterSpacing: "0.12em",
+          textTransform: "uppercase",
+          color: tone,
+          opacity: 0.75,
+          marginTop: 6,
+          position: "relative",
+          zIndex: 1,
+        }}
+      >
         {label}
       </p>
+    </div>
+  );
+}
+
+function SearchPillow({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  return (
+    <div
+      style={{
+        position: "relative",
+        borderRadius: 22,
+        background: "#fff",
+        boxShadow: PILLOW,
+        padding: "4px 4px 4px 14px",
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+      }}
+    >
+      <Search size={16} color="#94A3B8" strokeWidth={2.4} />
+      <input
+        placeholder="Search notices…"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        style={{
+          flex: 1,
+          background: "transparent",
+          border: "none",
+          outline: "none",
+          fontSize: 14,
+          fontWeight: 600,
+          color: "#0F172A",
+          padding: "12px 8px",
+          minWidth: 0,
+        }}
+      />
+      {value && (
+        <button
+          type="button"
+          onClick={() => onChange("")}
+          style={{
+            width: 32,
+            height: 32,
+            borderRadius: 999,
+            background: "#F1F5F9",
+            border: "none",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            cursor: "pointer",
+            flexShrink: 0,
+            marginRight: 4,
+          }}
+        >
+          <X size={14} color="#64748B" strokeWidth={2.4} />
+        </button>
+      )}
+    </div>
+  );
+}
+
+function EmptyState({
+  hasNotices,
+  onCompose,
+}: {
+  hasNotices: boolean;
+  onCompose: () => void;
+}) {
+  return (
+    <div
+      style={{
+        textAlign: "center",
+        padding: "40px 16px",
+        borderRadius: 22,
+        background: "#fff",
+        boxShadow: PILLOW,
+      }}
+    >
+      <p style={{ fontSize: 40, marginBottom: 8 }} aria-hidden>
+        📬
+      </p>
+      <p style={{ fontSize: 15, fontWeight: 800, color: NAVY }}>
+        {hasNotices ? "No matches" : "No notices yet"}
+      </p>
+      <p
+        style={{
+          fontSize: 12,
+          color: "#64748B",
+          marginTop: 6,
+          maxWidth: 280,
+          margin: "6px auto 0",
+          lineHeight: 1.5,
+        }}
+      >
+        {hasNotices
+          ? "Try a different search term."
+          : "Send your first class notice — parents see it instantly in their app."}
+      </p>
+      {!hasNotices && (
+        <button
+          type="button"
+          onClick={onCompose}
+          style={{
+            marginTop: 14,
+            padding: "10px 18px",
+            borderRadius: 14,
+            background: `linear-gradient(135deg, ${SKY}, #0284C7)`,
+            color: "#fff",
+            fontSize: 12,
+            fontWeight: 800,
+            border: "none",
+            cursor: "pointer",
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 6,
+            boxShadow: `0 8px 18px -6px ${SKY}88`,
+          }}
+          className="active:scale-95 hover:-translate-y-0.5 transition"
+        >
+          <Plus size={14} strokeWidth={2.6} />
+          Compose first notice
+        </button>
+      )}
     </div>
   );
 }
@@ -523,169 +876,270 @@ function NoticeCard({
   onTogglePin: () => void;
 }) {
   const typeMeta = TYPES.find((t) => t.key === notice.type) || TYPES[0];
+  const tt = TYPE_TONE[notice.type];
+  const audMeta = AUDIENCE_META[notice.audience];
   const expired =
-    notice.expiresAt && new Date(notice.expiresAt).getTime() < Date.now();
+    !!notice.expiresAt && new Date(notice.expiresAt).getTime() < Date.now();
   const mine = notice.createdBy === myUid;
 
   return (
-    <li
-      className={cn(
-        "relative rounded-2xl border-2 p-4 bg-white transition",
-        notice.pinned
-          ? "border-edu-yellow/60 bg-edu-light-yellow/30"
-          : mine
-          ? "border-edu-blue/30"
-          : "border-border",
-        expired && "opacity-60"
-      )}
+    <div
+      style={{
+        position: "relative",
+        overflow: "hidden",
+        borderRadius: 22,
+        padding: 14,
+        background: tt.surface,
+        boxShadow: PILLOW,
+        borderLeft: `5px solid ${tt.tone}`,
+        opacity: expired ? 0.6 : 1,
+        display: "flex",
+        flexDirection: "column",
+        gap: 10,
+      }}
     >
+      <DotScribbles color={tt.tone} />
+
+      {/* Pin sticker */}
       {notice.pinned && (
-        <Pin className="absolute top-3 right-3 w-3.5 h-3.5 text-edu-yellow" />
+        <span
+          style={{
+            position: "absolute",
+            top: 10,
+            right: 10,
+            width: 26,
+            height: 26,
+            borderRadius: 999,
+            background: `linear-gradient(135deg, ${BUTTER}, ${PEACH})`,
+            color: "#fff",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            boxShadow: `0 4px 10px ${BUTTER}66`,
+            transform: "rotate(8deg)",
+            zIndex: 2,
+          }}
+          aria-hidden
+        >
+          <Pin size={12} strokeWidth={2.6} fill="#fff" />
+        </span>
       )}
 
-      <div className="flex items-start gap-3">
-        <div
-          className={cn(
-            "shrink-0 w-10 h-10 rounded-xl flex items-center justify-center text-lg border",
-            TYPE_BG[notice.type]
-          )}
+      {/* Header */}
+      <div
+        style={{
+          position: "relative",
+          zIndex: 1,
+          display: "flex",
+          alignItems: "flex-start",
+          gap: 10,
+        }}
+      >
+        <span
+          style={{
+            width: 44,
+            height: 44,
+            borderRadius: 14,
+            background: `linear-gradient(135deg, ${tt.tone}, ${tt.tone}cc)`,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: 22,
+            boxShadow: `0 6px 14px ${tt.tone}55`,
+            transform: "rotate(-6deg)",
+            flexShrink: 0,
+          }}
+          aria-hidden
         >
           {typeMeta.emoji}
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className="font-black text-edu-navy text-sm leading-tight">
+        </span>
+        <div style={{ flex: 1, minWidth: 0, paddingRight: notice.pinned ? 30 : 0 }}>
+          <p
+            style={{
+              fontSize: 14,
+              fontWeight: 800,
+              color: NAVY,
+              letterSpacing: "-0.2px",
+              lineHeight: 1.25,
+            }}
+          >
             {notice.title}
           </p>
-          <div className="flex items-center gap-2 mt-1 flex-wrap">
-            <span className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground">
-              {typeMeta.label}
-            </span>
-            <span className="text-[10px] text-muted-foreground">·</span>
+          <div
+            style={{
+              display: "flex",
+              gap: 6,
+              flexWrap: "wrap",
+              marginTop: 6,
+              alignItems: "center",
+            }}
+          >
             <span
-              className={cn(
-                "text-[10px] font-bold rounded px-1.5 py-0.5",
-                notice.audience === "class"
-                  ? "bg-edu-light-blue text-edu-blue"
-                  : notice.audience === "stage"
-                  ? "bg-edu-light-green text-edu-green"
-                  : "bg-edu-light-pink text-edu-pink"
-              )}
+              style={{
+                fontSize: 9,
+                fontWeight: 900,
+                letterSpacing: "0.08em",
+                textTransform: "uppercase",
+                color: "#fff",
+                background: `linear-gradient(135deg, ${tt.tone}, ${tt.tone}cc)`,
+                padding: "3px 8px",
+                borderRadius: 999,
+                boxShadow: `0 3px 8px ${tt.tone}44`,
+              }}
             >
-              {notice.audience === "class"
-                ? "Your class"
-                : notice.audience === "stage"
-                ? "All Pre-Primary"
-                : "School-wide"}
+              {typeMeta.emoji} {typeMeta.label}
             </span>
-            {notice.publishedAt && (
-              <>
-                <span className="text-[10px] text-muted-foreground">·</span>
-                <span className="text-[10px] font-semibold text-muted-foreground">
-                  {formatDistanceToNow(new Date(notice.publishedAt), {
-                    addSuffix: true,
-                  })}
-                </span>
-              </>
-            )}
+            <span
+              style={{
+                fontSize: 9,
+                fontWeight: 800,
+                letterSpacing: "0.06em",
+                textTransform: "uppercase",
+                color: audMeta.tone,
+                background: "#fff",
+                padding: "3px 8px",
+                borderRadius: 999,
+                boxShadow: `inset 0 0 0 1px ${audMeta.tone}55`,
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 4,
+              }}
+            >
+              {audMeta.emoji} {audMeta.label}
+            </span>
             {expired && (
-              <span className="text-[10px] font-bold text-edu-red bg-edu-light-red px-1.5 py-0.5 rounded">
+              <span
+                style={{
+                  fontSize: 9,
+                  fontWeight: 900,
+                  letterSpacing: "0.06em",
+                  textTransform: "uppercase",
+                  color: "#fff",
+                  background: RED,
+                  padding: "3px 8px",
+                  borderRadius: 999,
+                  boxShadow: `0 3px 8px ${RED}44`,
+                }}
+              >
                 Expired
               </span>
             )}
+            {notice.publishedAt && (
+              <span style={{ fontSize: 10, fontWeight: 600, color: "#94A3B8" }}>
+                · {formatDistanceToNow(new Date(notice.publishedAt), { addSuffix: true })}
+              </span>
+            )}
           </div>
         </div>
       </div>
 
-      <p className="text-xs text-foreground/80 leading-relaxed mt-3 whitespace-pre-wrap line-clamp-4">
+      {/* Body */}
+      <p
+        style={{
+          position: "relative",
+          zIndex: 1,
+          fontSize: 12,
+          color: "#0F172A",
+          lineHeight: 1.55,
+          whiteSpace: "pre-wrap",
+          display: "-webkit-box",
+          WebkitLineClamp: 4,
+          WebkitBoxOrient: "vertical",
+          overflow: "hidden",
+        }}
+      >
         {notice.body}
       </p>
 
-      <div className="flex items-center justify-between mt-3 pt-3 border-t border-border text-[10px] text-muted-foreground">
-        <span className="font-semibold">
+      {/* Footer */}
+      <div
+        style={{
+          position: "relative",
+          zIndex: 1,
+          paddingTop: 8,
+          borderTop: "1px dashed rgba(15,23,42,0.12)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 8,
+          flexWrap: "wrap",
+        }}
+      >
+        <span style={{ fontSize: 10, fontWeight: 700, color: "#64748B" }}>
           {mine ? (
-            <span className="text-edu-blue">By you</span>
+            <span style={{ color: SKY }}>✍️ By you</span>
           ) : (
-            <>By {notice.createdByName || "Principal"}</>
+            <>— {notice.createdByName || "Principal"}</>
           )}
           {notice.expiresAt && !expired && (
-            <>
-              {" · "}
-              <span className="text-edu-orange">
-                exp {format(new Date(notice.expiresAt), "d MMM, h:mm a")}
-              </span>
-            </>
+            <span style={{ color: PEACH, marginLeft: 6, fontWeight: 800 }}>
+              · exp {format(new Date(notice.expiresAt), "d MMM, h:mm a")}
+            </span>
           )}
         </span>
         {mine && (
-          <div className="flex items-center gap-1">
-            <button
-              type="button"
+          <div style={{ display: "flex", gap: 4 }}>
+            <IconButton
+              tone={notice.pinned ? BUTTER : "#64748B"}
               onClick={onTogglePin}
-              className="w-7 h-7 rounded-lg hover:bg-secondary flex items-center justify-center"
               title={notice.pinned ? "Unpin" : "Pin to top"}
             >
               {notice.pinned ? (
-                <PinOff className="w-3.5 h-3.5 text-edu-yellow" />
+                <PinOff size={13} strokeWidth={2.4} />
               ) : (
-                <Pin className="w-3.5 h-3.5 text-muted-foreground" />
+                <Pin size={13} strokeWidth={2.4} />
               )}
-            </button>
-            <button
-              type="button"
-              onClick={onEdit}
-              className="w-7 h-7 rounded-lg hover:bg-secondary flex items-center justify-center"
-              title="Edit"
-            >
-              <Pencil className="w-3.5 h-3.5 text-muted-foreground" />
-            </button>
-            <button
-              type="button"
-              onClick={onDelete}
-              className="w-7 h-7 rounded-lg hover:bg-edu-light-red flex items-center justify-center"
-              title="Delete"
-            >
-              <Trash2 className="w-3.5 h-3.5 text-edu-red" />
-            </button>
+            </IconButton>
+            <IconButton tone={SKY} onClick={onEdit} title="Edit">
+              <Pencil size={13} strokeWidth={2.4} />
+            </IconButton>
+            <IconButton tone={RED} onClick={onDelete} title="Delete">
+              <Trash2 size={13} strokeWidth={2.4} />
+            </IconButton>
           </div>
         )}
       </div>
-    </li>
+    </div>
   );
 }
 
-function EmptyState({
-  onCompose,
-  hasNotices,
+function IconButton({
+  tone,
+  onClick,
+  title,
+  children,
 }: {
-  onCompose: () => void;
-  hasNotices: boolean;
+  tone: string;
+  onClick: () => void;
+  title: string;
+  children: React.ReactNode;
 }) {
   return (
-    <Card>
-      <CardContent className="p-10 text-center">
-        <p className="text-5xl mb-3">📬</p>
-        <p className="text-base font-black text-edu-navy">
-          {hasNotices ? "No matches" : "No notices yet"}
-        </p>
-        <p className="text-xs text-muted-foreground mt-2 max-w-xs mx-auto">
-          {hasNotices
-            ? "Try a different search term."
-            : "Send your first class notice — parents see it instantly in their app."}
-        </p>
-        {!hasNotices && (
-          <button
-            type="button"
-            onClick={onCompose}
-            className="mt-4 h-10 px-5 rounded-xl bg-edu-navy text-white font-bold text-sm inline-flex items-center gap-1.5 active:scale-95"
-          >
-            <Plus className="w-4 h-4" />
-            Compose first notice
-          </button>
-        )}
-      </CardContent>
-    </Card>
+    <button
+      type="button"
+      onClick={onClick}
+      title={title}
+      style={{
+        width: 28,
+        height: 28,
+        borderRadius: 999,
+        background: "#fff",
+        color: tone,
+        border: "none",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        cursor: "pointer",
+        boxShadow: `inset 0 0 0 1px ${tone}33`,
+      }}
+      className="active:scale-90 hover:-translate-y-0.5 transition"
+    >
+      {children}
+    </button>
   );
 }
+
+/* ═══════════════════════ Composer sheet ═══════════════════════ */
 
 function ComposerSheet({
   form,
@@ -708,172 +1162,526 @@ function ComposerSheet({
 }) {
   return (
     <div
-      className="fixed inset-0 z-[60] bg-black/50 backdrop-blur-sm flex items-end lg:items-center justify-center animate-fade-in"
       onClick={onClose}
       role="dialog"
       aria-modal="true"
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 60,
+        background: "rgba(15,23,42,0.5)",
+        backdropFilter: "blur(4px)",
+        WebkitBackdropFilter: "blur(4px)",
+        display: "flex",
+        alignItems: isDesktop ? "center" : "flex-end",
+        justifyContent: "center",
+        animation: "fade-in 200ms ease-out",
+      }}
     >
       <div
-        className={cn(
-          "bg-white shadow-2xl overflow-y-auto",
-          "w-full max-w-md max-h-[92vh]",
-          "rounded-t-3xl lg:rounded-2xl lg:max-w-lg",
-          "animate-slide-up lg:animate-fade-in"
-        )}
         onClick={(e) => e.stopPropagation()}
-        style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+        style={{
+          width: "100%",
+          maxWidth: isDesktop ? 540 : 480,
+          maxHeight: isDesktop ? "92vh" : "94vh",
+          overflowY: "auto",
+          background:
+            "linear-gradient(180deg, #F0F9FF 0%, #FFFFFF 28%, #FFFFFF 100%)",
+          borderRadius: isDesktop ? 28 : "28px 28px 0 0",
+          boxShadow: "0 -20px 60px rgba(15,23,42,0.18)",
+          animation: "slide-up 240ms cubic-bezier(.34,1.56,.64,1)",
+          position: "relative",
+          margin: isDesktop ? "0 16px" : 0,
+          paddingBottom: "env(safe-area-inset-bottom)",
+        }}
       >
-        <div className="lg:hidden w-12 h-1.5 bg-border rounded-full mx-auto mt-2.5 mb-1" />
-
-        {/* Header */}
-        <div className="px-5 pt-3 pb-2 flex items-start justify-between">
-          <div>
-            <p className="text-lg font-black text-edu-navy">
-              {editing ? "Edit Notice" : "New Notice"}
-            </p>
-            <p className="text-[11px] text-muted-foreground mt-0.5 flex items-center gap-1">
-              <Users className="w-3 h-3" />
-              Posts to <strong>{className}</strong> parents only
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="w-9 h-9 rounded-full hover:bg-secondary flex items-center justify-center"
-            aria-label="Close"
+        {/* Sticky header */}
+        <div
+          style={{
+            position: "sticky",
+            top: 0,
+            background:
+              "linear-gradient(180deg, rgba(240,249,255,0.95) 0%, rgba(255,255,255,0.85) 100%)",
+            backdropFilter: "blur(10px)",
+            WebkitBackdropFilter: "blur(10px)",
+            padding: isDesktop ? "16px 22px 14px" : "10px 18px 12px",
+            borderRadius: isDesktop ? "28px 28px 0 0" : "28px 28px 0 0",
+            zIndex: 10,
+          }}
+        >
+          {!isDesktop && (
+            <div
+              style={{
+                width: 48,
+                height: 5,
+                borderRadius: 999,
+                background: "#E2E8F0",
+                margin: "0 auto 12px",
+              }}
+            />
+          )}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "flex-start",
+              justifyContent: "space-between",
+              gap: 12,
+            }}
           >
-            <X className="w-4 h-4" />
-          </button>
+            <div>
+              <p
+                style={{
+                  fontSize: 10,
+                  fontWeight: 800,
+                  letterSpacing: "0.16em",
+                  textTransform: "uppercase",
+                  color: SKY,
+                  opacity: 0.85,
+                }}
+              >
+                {editing ? "Edit notice" : "New notice"}
+              </p>
+              <p
+                style={{
+                  fontSize: 20,
+                  fontWeight: 800,
+                  color: NAVY,
+                  marginTop: 2,
+                  letterSpacing: "-0.4px",
+                }}
+              >
+                {editing ? "Update Notice" : "Compose Notice"}{" "}
+                <span
+                  aria-hidden
+                  style={{
+                    display: "inline-block",
+                    transform: "rotate(-6deg)",
+                  }}
+                >
+                  📝
+                </span>
+              </p>
+              <p
+                style={{
+                  fontSize: 11,
+                  fontWeight: 600,
+                  color: "#64748B",
+                  marginTop: 4,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 4,
+                }}
+              >
+                <Megaphone size={11} strokeWidth={2.4} />
+                Posts to <strong style={{ color: SKY }}>{className}</strong>{" "}
+                parents only
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close"
+              style={{
+                width: 34,
+                height: 34,
+                borderRadius: 999,
+                background: "#F1F5F9",
+                border: "none",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                cursor: "pointer",
+                flexShrink: 0,
+              }}
+            >
+              <X size={16} color="#64748B" strokeWidth={2.4} />
+            </button>
+          </div>
         </div>
 
-        <div className="px-5 mt-3 space-y-4">
+        <div
+          style={{
+            padding: isDesktop ? "16px 22px 24px" : "12px 18px 24px",
+            display: "flex",
+            flexDirection: "column",
+            gap: 14,
+          }}
+        >
           {/* Title */}
           <div>
-            <Label
-              htmlFor="t-title"
-              className="text-xs font-bold uppercase tracking-wider"
-            >
-              Title
-            </Label>
-            <Input
-              id="t-title"
+            <FieldLabel emoji="🏷️">Title</FieldLabel>
+            <PillowInput
               value={form.title}
-              onChange={(e) => setForm({ ...form, title: e.target.value })}
+              onChange={(v) => setForm({ ...form, title: v })}
               placeholder="e.g. Picnic Friday — pack lunch"
               maxLength={120}
-              className="mt-1"
             />
           </div>
 
           {/* Body */}
           <div>
-            <Label
-              htmlFor="t-body"
-              className="text-xs font-bold uppercase tracking-wider"
-            >
-              Body
-            </Label>
+            <FieldLabel emoji="📝">Body</FieldLabel>
             <textarea
-              id="t-body"
               value={form.body}
               onChange={(e) => setForm({ ...form, body: e.target.value })}
               placeholder="Full details parents need to know…"
               rows={4}
               maxLength={1500}
-              className="mt-1 w-full rounded-xl border border-border px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-edu-blue/30"
+              style={{
+                width: "100%",
+                padding: "12px 14px",
+                borderRadius: 16,
+                background: "#fff",
+                border: "none",
+                fontSize: 13,
+                fontWeight: 500,
+                color: "#0F172A",
+                outline: "none",
+                resize: "none",
+                boxShadow: PILLOW,
+                fontFamily: "inherit",
+                lineHeight: 1.55,
+              }}
             />
-            <p className="text-[10px] text-muted-foreground mt-1">
+            <p
+              style={{
+                fontSize: 10,
+                fontWeight: 700,
+                color: form.body.length > 1400 ? PEACH : "#94A3B8",
+                marginTop: 4,
+                textAlign: "right",
+              }}
+            >
               {form.body.length}/1500
             </p>
           </div>
 
-          {/* Type */}
+          {/* Type tiles */}
           <div>
-            <Label className="text-xs font-bold uppercase tracking-wider">
-              Type
-            </Label>
-            <div className="mt-1 grid grid-cols-5 gap-2">
-              {TYPES.map((t) => (
-                <button
-                  key={t.key}
-                  type="button"
-                  onClick={() => setForm({ ...form, type: t.key })}
-                  className={cn(
-                    "rounded-xl border-2 p-2 text-center transition active:scale-95",
-                    form.type === t.key
-                      ? "border-edu-navy bg-edu-navy/5"
-                      : "border-border hover:border-foreground/30"
-                  )}
-                  title={t.label}
-                >
-                  <div className="text-lg leading-none">{t.emoji}</div>
-                  <div className="text-[9px] font-bold mt-0.5 text-muted-foreground uppercase tracking-wider">
-                    {t.label}
-                  </div>
-                </button>
-              ))}
+            <FieldLabel emoji="🎯">Type</FieldLabel>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(5, minmax(0, 1fr))",
+                gap: 6,
+              }}
+            >
+              {TYPES.map((t) => {
+                const tt = TYPE_TONE[t.key];
+                const selected = form.type === t.key;
+                return (
+                  <button
+                    key={t.key}
+                    type="button"
+                    onClick={() => setForm({ ...form, type: t.key })}
+                    style={{
+                      position: "relative",
+                      overflow: "hidden",
+                      aspectRatio: "3 / 4",
+                      borderRadius: 16,
+                      background: selected ? tt.surface : "#fff",
+                      border: "none",
+                      cursor: "pointer",
+                      boxShadow: selected
+                        ? `inset 0 0 0 2px ${tt.tone}, ${PILLOW}`
+                        : PILLOW,
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: 4,
+                      padding: 4,
+                      transition: "transform 140ms ease",
+                    }}
+                    className="active:scale-95"
+                  >
+                    <span
+                      style={{
+                        fontSize: 22,
+                        transform: selected ? "rotate(-8deg)" : "none",
+                        transition: "transform 200ms ease",
+                      }}
+                      aria-hidden
+                    >
+                      {t.emoji}
+                    </span>
+                    <span
+                      style={{
+                        fontSize: 9,
+                        fontWeight: 800,
+                        letterSpacing: "0.04em",
+                        color: selected ? tt.tone : "#475569",
+                        textAlign: "center",
+                        lineHeight: 1.2,
+                      }}
+                    >
+                      {t.label}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
           </div>
 
           {/* Pin + Expiry */}
-          <div className="grid grid-cols-2 gap-3">
-            <label className="flex items-center gap-2 rounded-xl border border-border p-3 cursor-pointer hover:border-foreground/30 transition">
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr",
+              gap: 8,
+            }}
+          >
+            {/* Pin toggle */}
+            <label
+              style={{
+                position: "relative",
+                overflow: "hidden",
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                padding: 12,
+                borderRadius: 16,
+                background: form.pinned
+                  ? "linear-gradient(135deg, #FFEBC8 0%, #FFF7E5 100%)"
+                  : "#fff",
+                boxShadow: form.pinned
+                  ? `inset 0 0 0 2px ${BUTTER}, ${PILLOW}`
+                  : PILLOW,
+                cursor: "pointer",
+              }}
+            >
+              {form.pinned && <DotScribbles color={BUTTER} />}
               <input
                 type="checkbox"
                 checked={form.pinned}
                 onChange={(e) =>
                   setForm({ ...form, pinned: e.target.checked })
                 }
-                className="w-4 h-4"
+                style={{
+                  width: 16,
+                  height: 16,
+                  accentColor: BUTTER,
+                  cursor: "pointer",
+                  position: "relative",
+                  zIndex: 1,
+                }}
               />
-              <div className="flex-1">
-                <p className="text-xs font-bold text-edu-navy flex items-center gap-1">
-                  <Pin className="w-3 h-3" /> Pin to top
+              <div style={{ position: "relative", zIndex: 1, minWidth: 0 }}>
+                <p
+                  style={{
+                    fontSize: 12,
+                    fontWeight: 800,
+                    color: form.pinned ? "#92400E" : NAVY,
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 4,
+                  }}
+                >
+                  <Pin size={12} strokeWidth={2.4} fill={form.pinned ? "#92400E" : "none"} />
+                  Pin to top
                 </p>
-                <p className="text-[10px] text-muted-foreground">Stays at top</p>
+                <p style={{ fontSize: 10, color: "#64748B", marginTop: 2 }}>
+                  Stays at top
+                </p>
               </div>
             </label>
+
+            {/* Expiry */}
             <div>
-              <Label className="text-xs font-bold uppercase tracking-wider flex items-center gap-1">
-                <CalendarIcon className="w-3 h-3" /> Expires (optional)
-              </Label>
-              <Input
+              <FieldLabel emoji="📅">Expires (optional)</FieldLabel>
+              <PillowInput
                 type="datetime-local"
                 value={form.expiresAt}
-                onChange={(e) =>
-                  setForm({ ...form, expiresAt: e.target.value })
-                }
-                className="mt-1"
+                onChange={(v) => setForm({ ...form, expiresAt: v })}
+                placeholder=""
               />
             </div>
           </div>
-        </div>
 
-        <div className="px-5 mt-5 pb-5 flex gap-2 justify-end">
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={saving}
-            className="h-10 px-4 rounded-xl border border-border text-sm font-bold hover:bg-secondary"
+          {/* Buttons */}
+          <div
+            style={{
+              display: "flex",
+              gap: 8,
+              marginTop: 4,
+            }}
           >
-            Cancel
-          </button>
-          <button
-            type="button"
-            onClick={onSave}
-            disabled={saving}
-            className="h-10 px-5 rounded-xl bg-edu-navy text-white font-bold text-sm flex items-center gap-1.5 active:scale-95 disabled:opacity-50"
-          >
-            {saving ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : editing ? (
-              "Save changes"
-            ) : (
-              "Post notice"
-            )}
-          </button>
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={saving}
+              style={{
+                padding: "12px 18px",
+                borderRadius: 16,
+                background: "#fff",
+                color: "#64748B",
+                fontSize: 13,
+                fontWeight: 800,
+                border: "none",
+                cursor: saving ? "default" : "pointer",
+                boxShadow: PILLOW,
+                opacity: saving ? 0.6 : 1,
+              }}
+              className="active:scale-95 hover:-translate-y-0.5 transition"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={onSave}
+              disabled={saving}
+              style={{
+                flex: 1,
+                padding: "12px 18px",
+                borderRadius: 16,
+                background: saving
+                  ? "#CBD5E1"
+                  : `linear-gradient(135deg, ${SKY}, #0284C7)`,
+                color: "#fff",
+                fontSize: 13,
+                fontWeight: 800,
+                border: "none",
+                cursor: saving ? "default" : "pointer",
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 6,
+                boxShadow: saving ? "none" : `0 10px 24px -6px ${SKY}88`,
+              }}
+              className="active:scale-95 hover:-translate-y-0.5 transition"
+            >
+              {saving ? (
+                <Loader2 size={14} className="animate-spin" />
+              ) : (
+                <Megaphone size={14} strokeWidth={2.4} />
+              )}
+              {editing ? "Save changes" : "Post notice"}
+            </button>
+          </div>
         </div>
       </div>
     </div>
   );
 }
+
+function FieldLabel({
+  emoji,
+  children,
+}: {
+  emoji?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 6,
+        marginBottom: 8,
+      }}
+    >
+      {emoji && (
+        <span
+          aria-hidden
+          style={{
+            fontSize: 13,
+            transform: "rotate(-6deg)",
+            display: "inline-block",
+          }}
+        >
+          {emoji}
+        </span>
+      )}
+      <p
+        style={{
+          fontSize: 10,
+          fontWeight: 800,
+          letterSpacing: "0.14em",
+          textTransform: "uppercase",
+          color: NAVY,
+          opacity: 0.75,
+        }}
+      >
+        {children}
+      </p>
+    </div>
+  );
+}
+
+function PillowInput({
+  value,
+  onChange,
+  placeholder,
+  maxLength,
+  type,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+  maxLength?: number;
+  type?: string;
+}) {
+  return (
+    <input
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      placeholder={placeholder}
+      maxLength={maxLength}
+      type={type}
+      style={{
+        width: "100%",
+        padding: "12px 14px",
+        borderRadius: 16,
+        background: "#fff",
+        border: "none",
+        fontSize: 13,
+        fontWeight: 600,
+        color: "#0F172A",
+        outline: "none",
+        boxShadow: PILLOW,
+      }}
+    />
+  );
+}
+
+function DotScribbles({
+  color,
+  dense = false,
+}: {
+  color: string;
+  dense?: boolean;
+}) {
+  return (
+    <svg
+      aria-hidden="true"
+      width="100%"
+      height="100%"
+      style={{
+        position: "absolute",
+        inset: 0,
+        opacity: dense ? 0.1 : 0.07,
+        pointerEvents: "none",
+      }}
+    >
+      <circle cx="14%" cy="24%" r="2.5" fill={color} />
+      <circle cx="82%" cy="14%" r="1.8" fill={color} />
+      <circle cx="68%" cy="62%" r="2" fill={color} />
+      <circle cx="22%" cy="80%" r="1.6" fill={color} />
+      <circle cx="48%" cy="32%" r="1.4" fill={color} />
+      {dense && (
+        <>
+          <circle cx="90%" cy="80%" r="2.2" fill={color} />
+          <circle cx="6%" cy="60%" r="1.4" fill={color} />
+          <circle cx="55%" cy="88%" r="1.6" fill={color} />
+        </>
+      )}
+    </svg>
+  );
+}
+
+// Palette constants reserved for future variants on this page.
+void LAV;
+
+/* Calendar icon kept imported but not used directly outside the FieldLabel
+   emoji prefix. Reference to keep tree-shaker happy. */
+void CalendarIcon;

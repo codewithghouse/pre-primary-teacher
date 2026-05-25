@@ -1,29 +1,14 @@
 /**
- * ClassSettings.tsx — Per-class configuration for the pre-primary teacher.
+ * ClassSettings.tsx — Per-class configuration. Cartoonified 2026-05-25.
  *
- * Persists to `pp_class_settings/{classId}` doc. Touch-points (V1.1):
- *   - diaperEnabled / napEnabled / mealsEnabled / photosEnabled toggle which
- *     features appear on Home page tiles
- *   - themeOfWeek shows on Home banner + parent's Today page
- *   - classAllergens augments per-student allergens for the meals allergen-
- *     flash check
- *   - arrival/dismissal times drive default attendance/pickup expectations
- *
- * Each toggle is independent — saving one doesn't reset others.
+ * Persists to pp_class_settings/{classId}. Each toggle auto-saves on change.
+ * Sections: Theme of Week / Feature toggles / Day mode + times / Class allergens.
  */
 import { useEffect, useState } from "react";
 import {
-  Settings,
   Loader2,
-  Sparkles,
-  Droplet,
-  Moon,
-  Utensils,
-  Camera,
-  Clock,
   Save,
-  AlertTriangle,
-  Users,
+  X,
 } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
@@ -34,9 +19,24 @@ import {
   type ClassSettings as Settings_,
   type DayMode,
 } from "@/hooks/usePPClassSettings";
-import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { cn } from "@/lib/utils";
+
+/* ═══════════════════════════════════════════════════════════════════════
+   PRE-PRIMARY TEACHER · CLASS SETTINGS
+   Storybook-sherbet auto-save form. Sherbet sections per feature group,
+   tile pickers for DayMode, mint toggle rows for features.
+   ════════════════════════════════════════════════════════════════════════ */
+
+const NAVY = "#1e3272";
+const MINT = "#10B981";
+const PEACH = "#FB923C";
+const BLUSH = "#EC4899";
+const SKY = "#0EA5E9";
+const LAV = "#A78BFA";
+const BUTTER = "#F59E0B";
+const RED = "#EF4444";
+
+const PILLOW =
+  "0 1px 0 rgba(255,255,255,0.55) inset, 0 14px 32px -10px rgba(30,50,114,0.16), 0 4px 10px rgba(30,50,114,0.06)";
 
 export default function ClassSettings() {
   const { primaryClass, loading: classLoading } = useTeacherClass();
@@ -49,24 +49,20 @@ export default function ClassSettings() {
   const [savingKey, setSavingKey] = useState<string | null>(null);
   const [allergenInput, setAllergenInput] = useState("");
 
-  // Sync local form with hook data on first arrival/change
   useEffect(() => {
     if (settings && !form) setForm(settings);
   }, [settings, form]);
 
   if (classLoading || settingsLoading || !form) {
-    return (
-      <div className="px-4 py-12 flex flex-col items-center text-muted-foreground gap-3">
-        <Loader2 className="w-6 h-6 animate-spin" />
-        <p className="text-xs">Loading settings…</p>
-      </div>
-    );
+    return <CenteredLoader label="Loading settings…" />;
   }
 
   if (!primaryClass) {
     return (
-      <div className="px-4 py-12 text-center">
-        <p className="text-sm font-bold text-edu-navy">No class assigned</p>
+      <div style={{ padding: "48px 16px", textAlign: "center" }}>
+        <p style={{ fontSize: 16, fontWeight: 800, color: NAVY }}>
+          🌱 No class assigned
+        </p>
       </div>
     );
   }
@@ -81,7 +77,6 @@ export default function ClassSettings() {
       console.error("[ClassSettings] save:", err);
       const msg = err instanceof Error ? err.message : String(err);
       toast.error(`Could not save: ${msg.slice(0, 150)}`);
-      // Revert
       setForm(settings || form);
     } finally {
       setSavingKey(null);
@@ -107,86 +102,186 @@ export default function ClassSettings() {
     );
   };
 
+  const dayModes: { key: DayMode; label: string; emoji: string; tone: string }[] = [
+    { key: "half", label: "Half day", emoji: "🌅", tone: PEACH },
+    { key: "full", label: "Full day", emoji: "🌞", tone: BUTTER },
+    { key: "extended", label: "Extended", emoji: "🌙", tone: LAV },
+  ];
+
   return (
     <div
-      className={cn(
-        "py-4 space-y-4 animate-fade-in",
-        isDesktop ? "px-6 lg:px-10 max-w-4xl mx-auto" : "px-4"
-      )}
+      className="animate-fade-in"
+      style={{
+        padding: isDesktop ? "24px 28px 80px" : "16px 16px 80px",
+        display: "flex",
+        flexDirection: "column",
+        gap: 16,
+        width: "100%",
+        maxWidth: 880,
+        margin: "0 auto",
+      }}
     >
-      {/* Header */}
-      <div className="flex items-center gap-2 pt-1">
+      {/* Hero */}
+      <div
+        style={{
+          position: "relative",
+          overflow: "hidden",
+          borderRadius: 28,
+          padding: isDesktop ? "22px 26px" : "18px 18px",
+          background:
+            "linear-gradient(135deg, #D6F5E2 0%, #F1FBF5 55%, #FFFFFF 100%)",
+          boxShadow: PILLOW,
+        }}
+      >
+        <DotScribbles color={MINT} dense />
         <div
-          className={cn(
-            "rounded-xl bg-edu-light-blue text-edu-blue flex items-center justify-center",
-            isDesktop ? "w-10 h-10" : "w-9 h-9"
-          )}
+          style={{
+            position: "relative",
+            zIndex: 1,
+            display: "flex",
+            alignItems: "center",
+            gap: 14,
+            flexWrap: "wrap",
+          }}
         >
-          <Settings className={isDesktop ? "w-5 h-5" : "w-4 h-4"} />
-        </div>
-        <div>
-          <h1
-            className={cn(
-              "font-black text-edu-navy leading-none",
-              isDesktop ? "text-2xl" : "text-xl"
-            )}
+          <span
+            style={{
+              width: 52,
+              height: 52,
+              borderRadius: 18,
+              background: `linear-gradient(135deg, ${MINT}, #059669)`,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: 26,
+              boxShadow: `0 8px 18px ${MINT}55`,
+              transform: "rotate(-8deg)",
+              flexShrink: 0,
+            }}
+            aria-hidden
           >
-            Class Settings
-          </h1>
-          <p className="text-[11px] text-muted-foreground mt-1 font-semibold flex items-center gap-1">
-            <Users className="w-3 h-3" />
-            {primaryClass.name}
-          </p>
+            ⚙️
+          </span>
+          <div style={{ flex: 1, minWidth: 200 }}>
+            <p
+              style={{
+                fontSize: 11,
+                fontWeight: 800,
+                letterSpacing: "0.16em",
+                textTransform: "uppercase",
+                color: MINT,
+                opacity: 0.9,
+              }}
+            >
+              Class config
+            </p>
+            <h1
+              style={{
+                fontSize: isDesktop ? 26 : 21,
+                fontWeight: 800,
+                letterSpacing: "-0.6px",
+                color: NAVY,
+                marginTop: 2,
+              }}
+            >
+              Class Settings{" "}
+              <span
+                aria-hidden
+                style={{ display: "inline-block", transform: "rotate(6deg)" }}
+              >
+                🛠️
+              </span>
+            </h1>
+            <p
+              style={{
+                fontSize: isDesktop ? 13 : 12,
+                fontWeight: 500,
+                color: "#64748B",
+                marginTop: 4,
+              }}
+            >
+              {primaryClass.name} · Auto-saves on change
+            </p>
+          </div>
         </div>
       </div>
 
-      {/* Theme of the week */}
+      {/* Theme of the Week */}
       <Section
-        icon={<Sparkles className="w-4 h-4 text-edu-pink" />}
+        emoji="✨"
+        tone={BLUSH}
+        surface="linear-gradient(135deg, #FFE0EC 0%, #FFF4F8 100%)"
         title="Theme of the Week"
         description="Shows on Home banner + parent's Today page"
       >
-        <div className="flex gap-2">
-          <Input
+        <div style={{ display: "flex", gap: 8 }}>
+          <PillowInput
             value={form.themeOfWeek || ""}
-            onChange={(e) =>
-              setForm({ ...form, themeOfWeek: e.target.value })
-            }
+            onChange={(v) => setForm({ ...form, themeOfWeek: v })}
             placeholder="e.g. Animals & their homes 🐘"
             maxLength={80}
-            className="flex-1"
           />
           <button
             type="button"
             onClick={() => saveField("themeOfWeek", form.themeOfWeek || "")}
             disabled={savingKey === "themeOfWeek"}
-            className="h-10 px-4 rounded-xl bg-edu-navy text-white font-bold text-sm flex items-center gap-1 active:scale-95 disabled:opacity-50"
+            style={{
+              padding: "12px 18px",
+              borderRadius: 16,
+              background:
+                savingKey === "themeOfWeek"
+                  ? "#CBD5E1"
+                  : `linear-gradient(135deg, ${BLUSH}, #DB2777)`,
+              color: "#fff",
+              fontSize: 13,
+              fontWeight: 800,
+              border: "none",
+              cursor: savingKey === "themeOfWeek" ? "default" : "pointer",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 6,
+              boxShadow:
+                savingKey === "themeOfWeek"
+                  ? "none"
+                  : `0 8px 18px -6px ${BLUSH}66`,
+              flexShrink: 0,
+            }}
+            className="active:scale-95 hover:-translate-y-0.5 transition"
           >
             {savingKey === "themeOfWeek" ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
+              <Loader2 size={14} className="animate-spin" />
             ) : (
-              <Save className="w-4 h-4" />
+              <Save size={14} strokeWidth={2.6} />
             )}
             Save
           </button>
         </div>
         {form.themeUpdatedAt && (
-          <p className="text-[10px] text-muted-foreground mt-1.5">
-            Last updated{" "}
-            {format(new Date(form.themeUpdatedAt), "d MMM, h:mm a")}
+          <p
+            style={{
+              fontSize: 10,
+              fontWeight: 600,
+              color: "#94A3B8",
+              marginTop: 6,
+            }}
+          >
+            Last updated {format(new Date(form.themeUpdatedAt), "d MMM, h:mm a")}
           </p>
         )}
       </Section>
 
       {/* Feature toggles */}
       <Section
-        icon={<Sparkles className="w-4 h-4 text-edu-blue" />}
+        emoji="🎨"
+        tone={SKY}
+        surface="linear-gradient(135deg, #DCEEFF 0%, #F5FAFF 100%)"
         title="Features"
         description="Toggle which Care & Routine tiles appear on Home. Useful for older classes that don't need diaper tracking."
       >
-        <div className="space-y-2">
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           <ToggleRow
-            icon={<Droplet className="w-4 h-4 text-edu-blue" />}
+            emoji="💧"
+            tone={SKY}
             label="Diaper / Washroom log"
             sub="Show /diaper page + Home tile"
             value={form.diaperEnabled}
@@ -194,7 +289,8 @@ export default function ClassSettings() {
             saving={savingKey === "diaperEnabled"}
           />
           <ToggleRow
-            icon={<Moon className="w-4 h-4 text-edu-yellow" />}
+            emoji="😴"
+            tone={LAV}
             label="Nap tracking"
             sub="Show nap controls on Meals & Nap page"
             value={form.napEnabled}
@@ -202,7 +298,8 @@ export default function ClassSettings() {
             saving={savingKey === "napEnabled"}
           />
           <ToggleRow
-            icon={<Utensils className="w-4 h-4 text-edu-orange" />}
+            emoji="🍱"
+            tone={BUTTER}
             label="Meals tracking"
             sub="Show meals controls + allergen flash"
             value={form.mealsEnabled}
@@ -210,7 +307,8 @@ export default function ClassSettings() {
             saving={savingKey === "mealsEnabled"}
           />
           <ToggleRow
-            icon={<Camera className="w-4 h-4 text-edu-pink" />}
+            emoji="📸"
+            tone={BLUSH}
             label="Photo Studio"
             sub="Show /photos page in sidebar"
             value={form.photosEnabled}
@@ -222,66 +320,100 @@ export default function ClassSettings() {
 
       {/* Day mode + timings */}
       <Section
-        icon={<Clock className="w-4 h-4 text-edu-green" />}
+        emoji="🕐"
+        tone={MINT}
+        surface="linear-gradient(135deg, #D6F5E2 0%, #F1FBF5 100%)"
         title="Daily Schedule"
         description="Drives attendance + pickup expectations"
       >
-        <div className="space-y-3">
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          {/* Day mode tiles */}
           <div>
-            <p className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground mb-1.5">
-              Day mode
-            </p>
-            <div className="grid grid-cols-3 gap-2">
-              {(
-                [
-                  { key: "half", label: "Half day", emoji: "🌅" },
-                  { key: "full", label: "Full day", emoji: "🌞" },
-                  { key: "extended", label: "Extended", emoji: "🌙" },
-                ] as { key: DayMode; label: string; emoji: string }[]
-              ).map((d) => (
-                <button
-                  key={d.key}
-                  type="button"
-                  onClick={() => saveField("dayMode", d.key)}
-                  disabled={savingKey === "dayMode"}
-                  className={cn(
-                    "rounded-xl border-2 p-2 text-center transition active:scale-95",
-                    form.dayMode === d.key
-                      ? "border-edu-navy bg-edu-navy/5"
-                      : "border-border hover:border-foreground/30"
-                  )}
-                >
-                  <div className="text-lg leading-none">{d.emoji}</div>
-                  <div className="text-[10px] font-bold mt-0.5 text-muted-foreground uppercase tracking-wider">
-                    {d.label}
-                  </div>
-                </button>
-              ))}
+            <FieldLabel emoji="📅">Day mode</FieldLabel>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+                gap: 6,
+              }}
+            >
+              {dayModes.map((d) => {
+                const selected = form.dayMode === d.key;
+                return (
+                  <button
+                    key={d.key}
+                    type="button"
+                    onClick={() => saveField("dayMode", d.key)}
+                    disabled={savingKey === "dayMode"}
+                    style={{
+                      position: "relative",
+                      overflow: "hidden",
+                      padding: "12px 6px",
+                      borderRadius: 16,
+                      background: selected
+                        ? `linear-gradient(135deg, ${d.tone}1f, ${d.tone}0f)`
+                        : "#fff",
+                      border: "none",
+                      cursor: "pointer",
+                      boxShadow: selected
+                        ? `inset 0 0 0 2px ${d.tone}, ${PILLOW}`
+                        : PILLOW,
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      gap: 4,
+                      transition: "transform 140ms ease",
+                    }}
+                    className="active:scale-95"
+                  >
+                    <span
+                      style={{
+                        fontSize: 22,
+                        transform: selected ? "rotate(-8deg)" : "none",
+                        transition: "transform 200ms ease",
+                      }}
+                      aria-hidden
+                    >
+                      {d.emoji}
+                    </span>
+                    <span
+                      style={{
+                        fontSize: 11,
+                        fontWeight: 800,
+                        color: selected ? d.tone : "#475569",
+                      }}
+                    >
+                      {d.label}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          {/* Times */}
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr",
+              gap: 8,
+            }}
+          >
             <div>
-              <p className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground mb-1">
-                Arrival time
-              </p>
-              <Input
+              <FieldLabel emoji="🌅">Arrival time</FieldLabel>
+              <PillowInput
                 type="time"
                 value={form.arrivalTime || ""}
-                onChange={(e) => setForm({ ...form, arrivalTime: e.target.value })}
+                onChange={(v) => setForm({ ...form, arrivalTime: v })}
                 onBlur={() => saveField("arrivalTime", form.arrivalTime)}
               />
             </div>
             <div>
-              <p className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground mb-1">
-                Dismissal time
-              </p>
-              <Input
+              <FieldLabel emoji="🌙">Dismissal time</FieldLabel>
+              <PillowInput
                 type="time"
                 value={form.dismissalTime || ""}
-                onChange={(e) =>
-                  setForm({ ...form, dismissalTime: e.target.value })
-                }
+                onChange={(v) => setForm({ ...form, dismissalTime: v })}
                 onBlur={() => saveField("dismissalTime", form.dismissalTime)}
               />
             </div>
@@ -291,96 +423,221 @@ export default function ClassSettings() {
 
       {/* Class allergens */}
       <Section
-        icon={<AlertTriangle className="w-4 h-4 text-edu-red" />}
+        emoji="🛟"
+        tone={RED}
+        surface="linear-gradient(135deg, #FFD6D6 0%, #FFF1F1 100%)"
         title="Class-wide Allergens"
-        description="Trigger allergen flash on meals page even if no specific child has them flagged on their record. Useful for picnic day caution."
+        description="Trigger allergen flash on meals page even if no specific child has them flagged. Useful for picnic day caution."
       >
-        <div className="flex gap-2 mb-3">
-          <Input
+        <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+          <PillowInput
             value={allergenInput}
-            onChange={(e) => setAllergenInput(e.target.value)}
+            onChange={setAllergenInput}
             onKeyDown={(e) => e.key === "Enter" && addAllergen()}
             placeholder="e.g. peanuts, gluten, shellfish"
             maxLength={40}
-            className="flex-1"
           />
           <button
             type="button"
             onClick={addAllergen}
             disabled={!allergenInput.trim() || savingKey === "classAllergens"}
-            className="h-10 px-4 rounded-xl bg-edu-red text-white font-bold text-sm flex items-center gap-1 active:scale-95 disabled:opacity-50"
+            style={{
+              padding: "12px 18px",
+              borderRadius: 16,
+              background:
+                !allergenInput.trim() || savingKey === "classAllergens"
+                  ? "#CBD5E1"
+                  : `linear-gradient(135deg, ${RED}, #DC2626)`,
+              color: "#fff",
+              fontSize: 13,
+              fontWeight: 800,
+              border: "none",
+              cursor:
+                !allergenInput.trim() || savingKey === "classAllergens"
+                  ? "default"
+                  : "pointer",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 6,
+              boxShadow:
+                !allergenInput.trim() || savingKey === "classAllergens"
+                  ? "none"
+                  : `0 8px 18px -6px ${RED}66`,
+              flexShrink: 0,
+            }}
+            className="active:scale-95 hover:-translate-y-0.5 transition"
           >
             Add
           </button>
         </div>
         {form.classAllergens.length === 0 ? (
-          <p className="text-xs text-muted-foreground italic">
+          <p
+            style={{
+              fontSize: 12,
+              color: "#64748B",
+              fontStyle: "italic",
+              padding: "8px 0",
+            }}
+          >
             No class-wide allergens set. Per-child allergens still trigger.
           </p>
         ) : (
-          <div className="flex flex-wrap gap-1.5">
-            {form.classAllergens.map((a) => (
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+            {form.classAllergens.map((a, idx) => (
               <button
                 key={a}
                 type="button"
                 onClick={() => removeAllergen(a)}
-                className="text-xs font-bold bg-edu-red/15 text-edu-red px-2 py-1 rounded-full capitalize flex items-center gap-1 hover:bg-edu-red/25"
                 title="Tap to remove"
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 4,
+                  fontSize: 12,
+                  fontWeight: 800,
+                  color: RED,
+                  background: "#fff",
+                  padding: "5px 10px 5px 12px",
+                  borderRadius: 999,
+                  textTransform: "capitalize",
+                  boxShadow: `inset 0 0 0 1px ${RED}33, 0 2px 6px rgba(239,68,68,0.10)`,
+                  transform: `rotate(${idx % 2 === 0 ? "-1.5deg" : "1.5deg"})`,
+                  border: "none",
+                  cursor: "pointer",
+                }}
+                className="active:scale-95 hover:-translate-y-0.5 transition"
               >
                 ⚠️ {a}
-                <span className="text-edu-red/60">×</span>
+                <X size={11} strokeWidth={2.6} color={RED} style={{ opacity: 0.7 }} />
               </button>
             ))}
           </div>
         )}
       </Section>
 
-      <p className="text-[10px] text-center text-muted-foreground pt-2">
-        Settings auto-save on change. Last updated by{" "}
+      <p
+        style={{
+          fontSize: 10,
+          textAlign: "center",
+          color: "#94A3B8",
+          fontWeight: 600,
+          paddingTop: 8,
+        }}
+      >
+        💾 Settings auto-save on change. Last updated by{" "}
         {form.updatedByName || "you"}.
       </p>
     </div>
   );
 }
 
+/* ═══════════════════════ building blocks ═══════════════════════ */
+
+function CenteredLoader({ label }: { label: string }) {
+  return (
+    <div
+      style={{
+        padding: "48px 16px",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        gap: 12,
+        color: "#64748B",
+      }}
+    >
+      <Loader2 className="animate-spin" />
+      <p style={{ fontSize: 12, fontWeight: 600 }}>{label}</p>
+    </div>
+  );
+}
+
 function Section({
-  icon,
+  emoji,
+  tone,
+  surface,
   title,
   description,
   children,
 }: {
-  icon: React.ReactNode;
+  emoji: string;
+  tone: string;
+  surface: string;
   title: string;
   description?: string;
   children: React.ReactNode;
 }) {
   return (
-    <Card>
-      <CardContent className="p-4">
-        <div className="flex items-center gap-2 mb-1">
-          {icon}
-          <h2 className="text-sm font-black text-edu-navy">{title}</h2>
+    <div
+      style={{
+        position: "relative",
+        overflow: "hidden",
+        borderRadius: 22,
+        padding: 16,
+        background: surface,
+        boxShadow: PILLOW,
+      }}
+    >
+      <DotScribbles color={tone} />
+      <div style={{ position: "relative", zIndex: 1 }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            marginBottom: 4,
+          }}
+        >
+          <span
+            style={{
+              fontSize: 18,
+              transform: "rotate(-6deg)",
+              display: "inline-block",
+              filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.08))",
+            }}
+            aria-hidden
+          >
+            {emoji}
+          </span>
+          <h2
+            style={{
+              fontSize: 14,
+              fontWeight: 800,
+              color: tone,
+              letterSpacing: "-0.2px",
+            }}
+          >
+            {title}
+          </h2>
         </div>
         {description && (
-          <p className="text-[11px] text-muted-foreground mb-3 leading-relaxed">
+          <p
+            style={{
+              fontSize: 11,
+              color: "#64748B",
+              lineHeight: 1.55,
+              marginBottom: 12,
+            }}
+          >
             {description}
           </p>
         )}
         {children}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }
 
 function ToggleRow({
-  icon,
+  emoji,
+  tone,
   label,
   sub,
   value,
   onChange,
   saving,
 }: {
-  icon: React.ReactNode;
+  emoji: string;
+  tone: string;
   label: string;
   sub: string;
   value: boolean;
@@ -389,29 +646,247 @@ function ToggleRow({
 }) {
   return (
     <label
-      className={cn(
-        "flex items-center gap-3 p-3 rounded-xl border-2 cursor-pointer transition",
-        value
-          ? "border-edu-green/30 bg-edu-light-green/30"
-          : "border-border bg-secondary/30"
-      )}
+      style={{
+        position: "relative",
+        overflow: "hidden",
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
+        padding: 12,
+        borderRadius: 16,
+        background: value
+          ? `linear-gradient(135deg, ${MINT}1f, ${MINT}0f)`
+          : "#fff",
+        boxShadow: value
+          ? `inset 0 0 0 2px ${MINT}, 0 4px 10px ${MINT}1f`
+          : "inset 0 0 0 1px #E2E8F0",
+        cursor: "pointer",
+      }}
     >
-      <div className="shrink-0">{icon}</div>
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-bold text-edu-navy">{label}</p>
-        <p className="text-[10px] text-muted-foreground">{sub}</p>
+      <span
+        aria-hidden
+        style={{
+          width: 36,
+          height: 36,
+          borderRadius: 12,
+          background: value
+            ? `linear-gradient(135deg, ${tone}, ${tone}cc)`
+            : `${tone}1f`,
+          color: value ? "#fff" : tone,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          fontSize: 18,
+          boxShadow: value ? `0 6px 14px ${tone}44` : "none",
+          transform: value ? "rotate(-6deg)" : "none",
+          transition: "transform 200ms ease",
+          flexShrink: 0,
+        }}
+      >
+        {emoji}
+      </span>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <p
+          style={{
+            fontSize: 13,
+            fontWeight: 800,
+            color: NAVY,
+            letterSpacing: "-0.2px",
+          }}
+        >
+          {label}
+        </p>
+        <p
+          style={{
+            fontSize: 10,
+            fontWeight: 600,
+            color: "#64748B",
+            marginTop: 2,
+          }}
+        >
+          {sub}
+        </p>
       </div>
       {saving ? (
-        <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+        <Loader2 size={16} className="animate-spin" color="#94A3B8" />
       ) : (
-        <input
-          type="checkbox"
-          checked={value}
-          onChange={(e) => onChange(e.target.checked)}
-          className="w-5 h-5 cursor-pointer"
-        />
+        <SherbetToggle checked={value} onChange={onChange} tone={MINT} />
       )}
     </label>
+  );
+}
+
+function SherbetToggle({
+  checked,
+  onChange,
+  tone,
+}: {
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  tone: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={(e) => {
+        e.preventDefault();
+        onChange(!checked);
+      }}
+      style={{
+        width: 44,
+        height: 26,
+        borderRadius: 999,
+        background: checked
+          ? `linear-gradient(135deg, ${tone}, #059669)`
+          : "#CBD5E1",
+        border: "none",
+        cursor: "pointer",
+        position: "relative",
+        boxShadow: checked
+          ? `inset 0 1px 2px rgba(15,23,42,0.06), 0 4px 10px ${tone}44`
+          : "inset 0 1px 2px rgba(15,23,42,0.12)",
+        transition: "background 200ms ease",
+        flexShrink: 0,
+      }}
+      aria-checked={checked}
+      role="switch"
+    >
+      <span
+        style={{
+          position: "absolute",
+          top: 3,
+          left: checked ? 21 : 3,
+          width: 20,
+          height: 20,
+          borderRadius: 999,
+          background: "#fff",
+          boxShadow: "0 2px 4px rgba(15,23,42,0.18)",
+          transition: "left 200ms cubic-bezier(.34,1.56,.64,1)",
+        }}
+      />
+    </button>
+  );
+}
+
+function PillowInput({
+  value,
+  onChange,
+  onBlur,
+  onKeyDown,
+  placeholder,
+  maxLength,
+  type,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  onBlur?: () => void;
+  onKeyDown?: (e: React.KeyboardEvent<HTMLInputElement>) => void;
+  placeholder?: string;
+  maxLength?: number;
+  type?: string;
+}) {
+  return (
+    <input
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      onBlur={onBlur}
+      onKeyDown={onKeyDown}
+      placeholder={placeholder}
+      maxLength={maxLength}
+      type={type}
+      style={{
+        flex: 1,
+        width: "100%",
+        padding: "12px 14px",
+        borderRadius: 16,
+        background: "#fff",
+        border: "none",
+        fontSize: 13,
+        fontWeight: 600,
+        color: "#0F172A",
+        outline: "none",
+        boxShadow: PILLOW,
+      }}
+    />
+  );
+}
+
+function FieldLabel({
+  emoji,
+  children,
+}: {
+  emoji?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 6,
+        marginBottom: 8,
+      }}
+    >
+      {emoji && (
+        <span
+          aria-hidden
+          style={{
+            fontSize: 13,
+            transform: "rotate(-6deg)",
+            display: "inline-block",
+          }}
+        >
+          {emoji}
+        </span>
+      )}
+      <p
+        style={{
+          fontSize: 10,
+          fontWeight: 800,
+          letterSpacing: "0.14em",
+          textTransform: "uppercase",
+          color: NAVY,
+          opacity: 0.75,
+        }}
+      >
+        {children}
+      </p>
+    </div>
+  );
+}
+
+function DotScribbles({
+  color,
+  dense = false,
+}: {
+  color: string;
+  dense?: boolean;
+}) {
+  return (
+    <svg
+      aria-hidden="true"
+      width="100%"
+      height="100%"
+      style={{
+        position: "absolute",
+        inset: 0,
+        opacity: dense ? 0.1 : 0.07,
+        pointerEvents: "none",
+      }}
+    >
+      <circle cx="14%" cy="24%" r="2.5" fill={color} />
+      <circle cx="82%" cy="14%" r="1.8" fill={color} />
+      <circle cx="68%" cy="62%" r="2" fill={color} />
+      <circle cx="22%" cy="80%" r="1.6" fill={color} />
+      <circle cx="48%" cy="32%" r="1.4" fill={color} />
+      {dense && (
+        <>
+          <circle cx="90%" cy="80%" r="2.2" fill={color} />
+          <circle cx="6%" cy="60%" r="1.4" fill={color} />
+          <circle cx="55%" cy="88%" r="1.6" fill={color} />
+        </>
+      )}
+    </svg>
   );
 }
 
