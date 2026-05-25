@@ -954,7 +954,7 @@ function ScaffoldFrame({ children }: { children: React.ReactNode }) {
         background: "#EEF4FF",
         padding: "20px 24px 80px",
         fontFamily:
-          "'Inter','Plus Jakarta Sans',-apple-system,sans-serif",
+          "'SF Pro Display',-apple-system,BlinkMacSystemFont,'SF Pro Text','Inter',sans-serif",
       }}
       className="max-w-[1280px] mx-auto"
     >

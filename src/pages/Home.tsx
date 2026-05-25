@@ -17,12 +17,15 @@ import { useClassRoster } from "@/hooks/useClassRoster";
 import { useTodayAttendance, type MoodKey } from "@/hooks/useTodayAttendance";
 import { usePPDailyActivities } from "@/hooks/usePPDailyActivities";
 import { usePPPickups } from "@/hooks/usePPPickups";
+import { usePPIncidents } from "@/hooks/usePPIncidents";
+import { useIsDesktop } from "@/hooks/useIsDesktop";
+import { CartoonAvatar } from "@/components/CartoonAvatar";
 
 /* ═══════════════════════════════════════════════════════════════════════
    PRE-PRIMARY TEACHER · HOME
-   Marketing-keynote inspired: pastel-sherbet greeting hero, 3-stat strip,
-   4 primary care quick-actions, horizontal slot timeline, pickup queue +
-   highlight card. Real-app readable typography; mobile-first.
+   Storybook-sherbet keynote: greeting hero, live class snapshot, 4 care
+   quick-actions, slot timeline, pickup queue with cartoon kids, incident
+   badge, theme strip. Distinct mobile + desktop compositions.
    ════════════════════════════════════════════════════════════════════════ */
 
 const NAVY = "#1e3272";
@@ -32,6 +35,18 @@ const BLUSH = "#EC4899";
 const SKY = "#0EA5E9";
 const LAV = "#A78BFA";
 const BUTTER = "#F59E0B";
+const RED = "#EF4444";
+
+// Soft pillow shadow — matches ThemedCard / ChildProfile360 vibe.
+const PILLOW =
+  "0 1px 0 rgba(255,255,255,0.55) inset, 0 14px 32px -10px rgba(30,50,114,0.16), 0 4px 10px rgba(30,50,114,0.06)";
+
+interface SlotLite {
+  id: string;
+  title: string;
+  plannedStart?: string;
+  status: string;
+}
 
 export default function Home() {
   const { teacherData } = useAuth();
@@ -40,13 +55,27 @@ export default function Home() {
   const { records } = useTodayAttendance(primaryClass?.id);
   const { data: activities } = usePPDailyActivities(primaryClass?.id);
   const { data: pickups } = usePPPickups(primaryClass?.id);
+  const { incidents } = usePPIncidents(primaryClass?.id);
+  const isDesktop = useIsDesktop();
 
-  const todayLong = format(new Date(), "EEEE · d MMM · h:mm a");
+  const now = new Date();
+  const hour = now.getHours();
+  const greet =
+    hour < 12
+      ? { label: "Good morning", emoji: "☀️", sticker: "🌈", tint: PEACH }
+      : hour < 17
+      ? { label: "Good afternoon", emoji: "🌤️", sticker: "🪁", tint: BUTTER }
+      : hour < 21
+      ? { label: "Good evening", emoji: "🌙", sticker: "✨", tint: LAV }
+      : { label: "Good night", emoji: "🌌", sticker: "💤", tint: NAVY };
+
+  const todayLong = format(now, "EEEE · d MMM · h:mm a");
   const firstName = teacherData?.name?.split(" ")[0] || "Teacher";
 
   // Live attendance + mood
   const presentCount = Object.values(records).filter(
-    (r) => r.status === "present" || r.status === "late" || r.status === "half-day"
+    (r) =>
+      r.status === "present" || r.status === "late" || r.status === "half-day"
   ).length;
   const totalKids = roster.length;
   const moodMix = Object.values(records).reduce(
@@ -59,94 +88,188 @@ export default function Home() {
   const happy = moodMix.happy || 0;
   const quiet = (moodMix.ok || 0) + (moodMix.sleepy || 0);
 
-  const slots = activities?.slots || [];
+  const slots: SlotLite[] = activities?.slots || [];
   const liveSlot = slots.find((s) => s.status === "in_progress");
+  const doneSlots = slots.filter((s) => s.status === "done").length;
+  const pendingSlots = slots.filter((s) => s.status === "pending").length;
+
   const pickupsVerified = pickups
-    ? Object.values(pickups.records).filter((r) => r.status === "verified").length
+    ? Object.values(pickups.records).filter((r) => r.status === "verified")
+        .length
     : 0;
   const pickupsPending = pickups
-    ? Object.values(pickups.records).filter((r) => r.status === "pending").length
+    ? Object.values(pickups.records).filter((r) => r.status === "pending")
+        .length
     : 0;
 
-  return (
-    <div className="px-4 py-4 space-y-4 animate-fade-in">
-      {/* ───── Greeting hero (pastel sherbet) ───── */}
+  const unhandledIncidents = incidents.filter((i) => !i.handled).length;
+  const hotIncidents = incidents.filter(
+    (i) => !i.handled && (i.severity === "high" || i.severity === "critical")
+  ).length;
+
+  const themeOfWeek = activities?.themeOfWeek || null;
+  const className = primaryClass?.name || "Your class";
+
+  /* ───────────────────────── DESKTOP ───────────────────────── */
+  if (isDesktop) {
+    return (
       <div
-        className="relative overflow-hidden rounded-[22px] p-5 shadow-[0_8px_24px_rgba(251,146,60,0.12)]"
+        className="animate-fade-in"
         style={{
-          background:
-            "linear-gradient(135deg, #FFF1E0 0%, #FCE7F3 55%, #DBEAFE 100%)",
+          padding: "24px 32px 80px",
+          maxWidth: 1280,
+          margin: "0 auto",
         }}
       >
-        <span aria-hidden className="absolute right-3 top-2 text-4xl opacity-80 select-none">
-          ☀️
-        </span>
-        <p
-          className="text-[10px] font-extrabold uppercase tracking-[0.18em]"
-          style={{ color: PEACH }}
-        >
-          {todayLong}
-        </p>
-        <h1
-          className="mt-1 text-2xl font-extrabold leading-tight tracking-tight"
-          style={{ color: "#0F172A" }}
-        >
-          Good morning, {firstName} 🌈
-        </h1>
-        <p className="mt-1 text-[13px] font-medium text-slate-600 max-w-[320px] leading-snug">
-          {primaryClass?.name || "Your class"} is settling in.{" "}
-          <strong className="text-slate-900">
-            {presentCount} of {totalKids || "—"}
-          </strong>{" "}
-          {totalKids ? "children are here today." : "children loading…"}
-        </p>
+        <Hero
+          greet={greet}
+          todayLong={todayLong}
+          firstName={firstName}
+          className={className}
+          presentCount={presentCount}
+          totalKids={totalKids}
+          happy={happy}
+          quiet={quiet}
+          isDesktop
+        />
 
-        {/* 3-stat strip */}
-        <div className="mt-4 grid grid-cols-3 gap-2">
-          <StatPill
-            value={`${presentCount}/${totalKids || "—"}`}
-            label="Present"
-            color={MINT}
-            emoji="🌤️"
+        <div style={{ height: 18 }} />
+
+        <SectionHeader title="Care & Routine" hint="Tap to log" rightTag="4 quick actions" />
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(4, 1fr)",
+            gap: 16,
+          }}
+        >
+          <CareCard
+            href="/attendance"
+            label="Attendance"
+            helper={`${presentCount} / ${totalKids || "—"} in`}
+            color={NAVY}
+            bg="#E0E7FF"
+            Icon={CheckSquare}
+            emoji="✅"
           />
-          <StatPill
-            value={String(happy)}
-            label="Happy"
+          <CareCard
+            href="/meals-nap"
+            label="Log Care"
+            helper="Diaper · Meals · Nap"
+            color={PEACH}
+            bg="#FFEDD5"
+            Icon={Leaf}
+            emoji="🍃"
+          />
+          <CareCard
+            href="/behavior"
+            label="Add Note"
+            helper="Behaviour or milestone"
             color={BLUSH}
-            emoji="😊"
+            bg="#FCE7F3"
+            Icon={PencilLine}
+            emoji="💌"
           />
-          <StatPill
-            value={String(quiet)}
-            label="Quiet"
+          <CareCard
+            href="/photos"
+            label="Photo Studio"
+            helper="Consent-respecting"
             color={SKY}
-            emoji="🌙"
+            bg="#DBEAFE"
+            Icon={Camera}
+            emoji="📸"
           />
         </div>
-      </div>
 
-      {/* ───── Care & Routine — primary 4 quick-actions ───── */}
-      <section>
-        <div className="flex items-baseline justify-between px-1 mb-2">
-          <div className="flex items-baseline gap-2">
-            <h2
-              className="text-[15px] font-extrabold tracking-tight"
-              style={{ color: "#0F172A" }}
-            >
-              Care &amp; Routine
-            </h2>
-            <span className="text-[11px] font-semibold text-slate-500">
-              Tap to log
-            </span>
-          </div>
-          <span
-            className="text-[10px] font-extrabold uppercase tracking-[0.18em]"
-            style={{ color: PEACH }}
-          >
-            4 quick actions
-          </span>
+        <div style={{ height: 22 }} />
+
+        {/* Two-col: slot timeline + pickup card */}
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "1.6fr 1fr",
+            gap: 18,
+          }}
+        >
+          <SlotPanel
+            slots={slots}
+            liveSlot={liveSlot}
+            doneSlots={doneSlots}
+            pendingSlots={pendingSlots}
+          />
+          <PickupPanel
+            roster={roster}
+            pickups={pickups}
+            pickupsVerified={pickupsVerified}
+            pickupsPending={pickupsPending}
+            limit={4}
+          />
         </div>
 
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div style={{ height: 18 }} />
+
+        <SectionHeader title="More" hint="Quick logs" />
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(4, 1fr)",
+            gap: 14,
+          }}
+        >
+          <MiniAction href="/diaper" Icon={Droplet} label="Diaper" color={SKY} />
+          <MiniAction
+            href="/milestones"
+            Icon={Star}
+            label="Milestones"
+            color={BUTTER}
+          />
+          <MiniAction
+            href="/pickup"
+            Icon={ShieldCheck}
+            label="Pickup"
+            color={MINT}
+          />
+          <MiniAction
+            href="/incidents"
+            Icon={AlertTriangle}
+            label="Incident"
+            color={RED}
+            badge={unhandledIncidents}
+            urgent={hotIncidents > 0}
+          />
+        </div>
+
+        {themeOfWeek && (
+          <>
+            <div style={{ height: 18 }} />
+            <ThemeStrip themeOfWeek={themeOfWeek} />
+          </>
+        )}
+      </div>
+    );
+  }
+
+  /* ────────────────────────── MOBILE ─────────────────────────── */
+  return (
+    <div className="px-4 py-4 space-y-4 animate-fade-in">
+      <Hero
+        greet={greet}
+        todayLong={todayLong}
+        firstName={firstName}
+        className={className}
+        presentCount={presentCount}
+        totalKids={totalKids}
+        happy={happy}
+        quiet={quiet}
+      />
+
+      <section>
+        <SectionHeader
+          title="Care & Routine"
+          hint="Tap to log"
+          rightTag="4 quick actions"
+        />
+        <div className="grid grid-cols-2 gap-3">
           <CareCard
             href="/attendance"
             label="Attendance"
@@ -186,152 +309,23 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ───── Today's slots — horizontal strip ───── */}
       {slots.length > 0 && (
-        <section
-          className="rounded-2xl bg-white p-4 shadow-[0_4px_14px_rgba(15,23,42,0.06)]"
-        >
-          <div className="flex items-baseline justify-between mb-3">
-            <div>
-              <p
-                className="text-[10px] font-extrabold uppercase tracking-[0.18em]"
-                style={{ color: PEACH }}
-              >
-                Today's slots
-              </p>
-              <p
-                className="text-[15px] font-extrabold tracking-tight"
-                style={{ color: "#0F172A" }}
-              >
-                {slots.filter((s) => s.status === "done").length} done ·{" "}
-                {liveSlot ? "1 live" : "0 live"} ·{" "}
-                {slots.filter((s) => s.status === "pending").length} to come
-              </p>
-            </div>
-            {liveSlot && (
-              <span
-                className="px-2 py-1 rounded-full text-[10px] font-extrabold tracking-wider"
-                style={{ background: `${PEACH}22`, color: PEACH }}
-              >
-                {liveSlot.title} · live
-              </span>
-            )}
-            <Link
-              to="/daily-activities"
-              className="text-[11px] font-semibold"
-              style={{ color: NAVY }}
-            >
-              Open →
-            </Link>
-          </div>
-
-          <ol className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1 snap-x">
-            {slots.slice(0, 6).map((slot) => (
-              <SlotPill key={slot.id} slot={slot} />
-            ))}
-          </ol>
-        </section>
+        <SlotPanel
+          slots={slots}
+          liveSlot={liveSlot}
+          doneSlots={doneSlots}
+          pendingSlots={pendingSlots}
+        />
       )}
 
-      {/* ───── Pickup queue + Highlight ───── */}
-      <div className="grid grid-cols-1 sm:grid-cols-[1.6fr_1fr] gap-3">
-        <Link
-          to="/pickup"
-          className="rounded-2xl bg-white p-4 shadow-[0_4px_14px_rgba(15,23,42,0.06)] border border-emerald-100 hover:shadow-lg transition active:scale-[0.99] block"
-        >
-          <div className="flex items-baseline justify-between">
-            <p
-              className="text-[14px] font-extrabold tracking-tight"
-              style={{ color: "#0F172A" }}
-            >
-              Pickup queue
-            </p>
-            <span
-              className="px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider"
-              style={{ background: `${MINT}22`, color: MINT }}
-            >
-              {pickupsVerified} confirmed
-            </span>
-          </div>
-          <p className="text-[11px] font-semibold text-slate-500 mt-1">
-            {pickupsPending > 0
-              ? `${pickupsPending} pending verification`
-              : "All clear so far"}
-          </p>
+      <PickupPanel
+        roster={roster}
+        pickups={pickups}
+        pickupsVerified={pickupsVerified}
+        pickupsPending={pickupsPending}
+        limit={3}
+      />
 
-          <div className="mt-3 space-y-2">
-            {pickups
-              ? Object.entries(pickups.records)
-                  .slice(0, 3)
-                  .map(([id, rec]) => {
-                    const child = roster.find((r) => r.id === id);
-                    const verified = rec.status === "verified";
-                    return (
-                      <div key={id} className="flex items-center gap-2.5">
-                        <div
-                          className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-extrabold text-white shrink-0"
-                          style={{
-                            background: verified ? MINT : BUTTER,
-                            boxShadow: `0 2px 6px ${(verified ? MINT : BUTTER)}55`,
-                          }}
-                        >
-                          {child?.name?.[0] || "?"}
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <p className="text-[13px] font-bold text-slate-900 truncate">
-                            {child?.name?.split(" ")[0] || "—"}
-                          </p>
-                          <p className="text-[11px] font-medium text-slate-500 truncate">
-                            {rec.pickerRelation || "Picker"} ·{" "}
-                            {verified ? "Verified" : "Pending"}
-                          </p>
-                        </div>
-                      </div>
-                    );
-                  })
-              : (
-                <p className="text-[12px] font-medium text-slate-500">
-                  No pickups logged yet — open queue to set up.
-                </p>
-              )}
-          </div>
-        </Link>
-
-        <div
-          className="relative overflow-hidden rounded-2xl p-4 shadow-[0_4px_14px_rgba(245,158,11,0.18)]"
-          style={{
-            background: `linear-gradient(135deg, ${BUTTER}22, ${PEACH}14)`,
-          }}
-        >
-          <span
-            aria-hidden
-            className="absolute right-2 bottom-0 text-5xl opacity-20 select-none"
-          >
-            🌟
-          </span>
-          <p
-            className="text-[10px] font-extrabold uppercase tracking-[0.18em]"
-            style={{ color: BUTTER }}
-          >
-            Highlight
-          </p>
-          <p
-            className="mt-1 text-[15px] font-extrabold leading-tight tracking-tight"
-            style={{ color: "#0F172A" }}
-          >
-            {slots.length > 0
-              ? `${slots.filter((s) => s.status === "done").length} slots logged today`
-              : "Plan today's slots →"}
-          </p>
-          <p className="mt-1 text-[11px] font-semibold text-slate-600 leading-snug">
-            {activities?.themeOfWeek
-              ? `Theme: ${activities.themeOfWeek}`
-              : "Set the week's theme from school dashboard"}
-          </p>
-        </div>
-      </div>
-
-      {/* ───── Secondary quick-row (Diaper / Milestones / Pickup / Incident) ───── */}
       <section className="pt-1">
         <p
           className="text-[10px] font-extrabold uppercase tracking-[0.18em] px-1 mb-2"
@@ -340,46 +334,188 @@ export default function Home() {
           More
         </p>
         <div className="grid grid-cols-4 gap-2">
-          <MiniAction href="/diaper"     Icon={Droplet}        label="Diaper"     color={SKY} />
-          <MiniAction href="/milestones" Icon={Star}            label="Milestones" color={BUTTER} />
-          <MiniAction href="/pickup"     Icon={ShieldCheck}    label="Pickup"     color={MINT} />
-          <MiniAction href="/incidents"  Icon={AlertTriangle}  label="Incident"   color="#EF4444" />
+          <MiniAction href="/diaper" Icon={Droplet} label="Diaper" color={SKY} />
+          <MiniAction
+            href="/milestones"
+            Icon={Star}
+            label="Milestones"
+            color={BUTTER}
+          />
+          <MiniAction
+            href="/pickup"
+            Icon={ShieldCheck}
+            label="Pickup"
+            color={MINT}
+          />
+          <MiniAction
+            href="/incidents"
+            Icon={AlertTriangle}
+            label="Incident"
+            color={RED}
+            badge={unhandledIncidents}
+            urgent={hotIncidents > 0}
+          />
         </div>
       </section>
 
-      {/* ───── Theme of week (slim, deprioritised vs hero) ───── */}
-      {activities?.themeOfWeek && (
-        <section
-          className="rounded-2xl p-3 flex items-center gap-3"
-          style={{ background: `linear-gradient(135deg, ${LAV}22, ${BLUSH}10)` }}
-        >
-          <span
-            className="w-9 h-9 rounded-xl flex items-center justify-center text-white"
-            style={{ background: `linear-gradient(135deg, ${LAV}, #8B5CF6)` }}
-          >
-            <Sparkles className="w-4 h-4" strokeWidth={2.2} />
-          </span>
-          <div className="min-w-0 flex-1">
-            <p
-              className="text-[10px] font-extrabold uppercase tracking-[0.18em]"
-              style={{ color: LAV }}
-            >
-              This week's theme
-            </p>
-            <p
-              className="text-[13px] font-extrabold leading-tight tracking-tight truncate"
-              style={{ color: "#0F172A" }}
-            >
-              {activities.themeOfWeek}
-            </p>
-          </div>
-        </section>
-      )}
+      {themeOfWeek && <ThemeStrip themeOfWeek={themeOfWeek} />}
     </div>
   );
 }
 
-/* ─── building blocks ───────────────────────────────────────────────── */
+/* ═══════════════════════ building blocks ═══════════════════════ */
+
+interface GreetMeta {
+  label: string;
+  emoji: string;
+  sticker: string;
+  tint: string;
+}
+
+function Hero({
+  greet,
+  todayLong,
+  firstName,
+  className,
+  presentCount,
+  totalKids,
+  happy,
+  quiet,
+  isDesktop = false,
+}: {
+  greet: GreetMeta;
+  todayLong: string;
+  firstName: string;
+  className: string;
+  presentCount: number;
+  totalKids: number;
+  happy: number;
+  quiet: number;
+  isDesktop?: boolean;
+}) {
+  return (
+    <div
+      style={{
+        position: "relative",
+        overflow: "hidden",
+        borderRadius: 28,
+        padding: isDesktop ? "26px 32px" : "20px",
+        background:
+          "linear-gradient(135deg, #FFF1E0 0%, #FCE7F3 55%, #DBEAFE 100%)",
+        boxShadow: PILLOW,
+      }}
+    >
+      <DotScribbles color={greet.tint} dense />
+
+      {/* Floating stickers */}
+      <span
+        aria-hidden
+        style={{
+          position: "absolute",
+          right: isDesktop ? 32 : 14,
+          top: isDesktop ? 18 : 10,
+          fontSize: isDesktop ? 52 : 38,
+          transform: "rotate(8deg)",
+          filter: "drop-shadow(0 4px 8px rgba(0,0,0,0.10))",
+          opacity: 0.95,
+          pointerEvents: "none",
+        }}
+      >
+        {greet.emoji}
+      </span>
+      <span
+        aria-hidden
+        style={{
+          position: "absolute",
+          right: isDesktop ? 90 : 56,
+          top: isDesktop ? 64 : 44,
+          fontSize: isDesktop ? 22 : 18,
+          transform: "rotate(-12deg)",
+          opacity: 0.9,
+          pointerEvents: "none",
+        }}
+      >
+        {greet.sticker}
+      </span>
+
+      {/* Greeting block */}
+      <div style={{ position: "relative", zIndex: 1, maxWidth: isDesktop ? 600 : 320 }}>
+        <p
+          style={{
+            fontSize: 10,
+            fontWeight: 800,
+            letterSpacing: "0.18em",
+            textTransform: "uppercase",
+            color: greet.tint,
+          }}
+        >
+          {todayLong}
+        </p>
+        <h1
+          style={{
+            marginTop: 4,
+            fontSize: isDesktop ? 30 : 24,
+            fontWeight: 800,
+            lineHeight: 1.12,
+            letterSpacing: "-0.6px",
+            color: "#0F172A",
+          }}
+        >
+          {greet.label}, {firstName}{" "}
+          <span style={{ display: "inline-block", transform: "rotate(-6deg)" }}>
+            🌈
+          </span>
+        </h1>
+        <p
+          style={{
+            marginTop: 6,
+            fontSize: isDesktop ? 14 : 13,
+            fontWeight: 500,
+            color: "#475569",
+            lineHeight: 1.45,
+          }}
+        >
+          {className} is settling in.{" "}
+          <strong style={{ color: "#0F172A", fontWeight: 700 }}>
+            {presentCount} of {totalKids || "—"}
+          </strong>{" "}
+          {totalKids ? "children are here today." : "children loading…"}
+        </p>
+      </div>
+
+      {/* Stat strip */}
+      <div
+        style={{
+          marginTop: 18,
+          display: "grid",
+          gridTemplateColumns: isDesktop
+            ? "repeat(4, minmax(0,1fr))"
+            : "repeat(3, minmax(0,1fr))",
+          gap: 10,
+          position: "relative",
+          zIndex: 1,
+        }}
+      >
+        <StatPill
+          value={`${presentCount}/${totalKids || "—"}`}
+          label="Present"
+          color={MINT}
+          emoji="🌤️"
+        />
+        <StatPill value={String(happy)} label="Happy" color={BLUSH} emoji="😊" />
+        <StatPill value={String(quiet)} label="Quiet" color={SKY} emoji="🌙" />
+        {isDesktop && (
+          <StatPill
+            value={String(totalKids - presentCount)}
+            label="Absent"
+            color={NAVY}
+            emoji="📭"
+          />
+        )}
+      </div>
+    </div>
+  );
+}
 
 function StatPill({
   value,
@@ -393,21 +529,96 @@ function StatPill({
   emoji: string;
 }) {
   return (
-    <div className="rounded-2xl bg-white px-3 py-2.5 shadow-[0_3px_10px_rgba(15,23,42,0.06)]">
-      <div className="flex items-baseline gap-1.5">
+    <div
+      style={{
+        borderRadius: 20,
+        background: "rgba(255,255,255,0.78)",
+        backdropFilter: "blur(6px)",
+        WebkitBackdropFilter: "blur(6px)",
+        padding: "10px 12px",
+        boxShadow:
+          "0 1px 0 rgba(255,255,255,0.7) inset, 0 6px 14px -6px rgba(15,23,42,0.10)",
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
         <span
-          className="text-xl font-extrabold leading-none tracking-tight"
-          style={{ color }}
+          style={{
+            fontSize: 22,
+            fontWeight: 800,
+            letterSpacing: "-0.8px",
+            color,
+            lineHeight: 1,
+          }}
         >
           {value}
         </span>
-        <span className="text-base leading-none">{emoji}</span>
+        <span style={{ fontSize: 16, lineHeight: 1 }}>{emoji}</span>
       </div>
       <p
-        className="mt-1 text-[10px] font-extrabold uppercase tracking-[0.14em] text-slate-500"
+        style={{
+          marginTop: 6,
+          fontSize: 10,
+          fontWeight: 800,
+          letterSpacing: "0.14em",
+          textTransform: "uppercase",
+          color: "#64748B",
+        }}
       >
         {label}
       </p>
+    </div>
+  );
+}
+
+function SectionHeader({
+  title,
+  hint,
+  rightTag,
+}: {
+  title: string;
+  hint?: string;
+  rightTag?: string;
+}) {
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "baseline",
+        justifyContent: "space-between",
+        padding: "0 4px",
+        marginBottom: 10,
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+        <h2
+          style={{
+            fontSize: 15,
+            fontWeight: 800,
+            letterSpacing: "-0.3px",
+            color: "#0F172A",
+          }}
+        >
+          {title}
+        </h2>
+        {hint && (
+          <span style={{ fontSize: 11, fontWeight: 600, color: "#64748B" }}>
+            {hint}
+          </span>
+        )}
+      </div>
+      {rightTag && (
+        <span
+          style={{
+            fontSize: 10,
+            fontWeight: 800,
+            letterSpacing: "0.18em",
+            textTransform: "uppercase",
+            color: PEACH,
+          }}
+        >
+          {rightTag}
+        </span>
+      )}
     </div>
   );
 }
@@ -426,77 +637,249 @@ function CareCard({
   helper: string;
   color: string;
   bg: string;
-  Icon: React.ComponentType<{ className?: string }>;
+  Icon: React.ComponentType<{ size?: number; strokeWidth?: number; color?: string }>;
   emoji: string;
 }) {
   return (
     <Link
       to={href}
-      className="relative overflow-hidden rounded-2xl bg-white p-3.5 shadow-[0_4px_12px_rgba(15,23,42,0.06)] hover:shadow-lg active:scale-[0.98] transition block"
-      style={{ borderTop: `0.5px solid ${color}22` }}
+      style={{
+        position: "relative",
+        overflow: "hidden",
+        borderRadius: 24,
+        background: "#fff",
+        padding: 16,
+        boxShadow: PILLOW,
+        display: "block",
+        borderTop: `0.5px solid ${color}22`,
+        transition: "transform 160ms ease, box-shadow 160ms ease",
+      }}
+      className="hover:-translate-y-0.5 active:scale-[0.98]"
     >
       <span
         aria-hidden
-        className="absolute -right-2 -bottom-3 text-5xl opacity-10 select-none"
+        style={{
+          position: "absolute",
+          right: -10,
+          bottom: -14,
+          fontSize: 56,
+          opacity: 0.12,
+          pointerEvents: "none",
+          transform: "rotate(-6deg)",
+        }}
       >
         {emoji}
       </span>
       <div
-        className="w-10 h-10 rounded-xl flex items-center justify-center mb-3"
-        style={{ background: bg, color }}
+        style={{
+          width: 44,
+          height: 44,
+          borderRadius: 16,
+          background: bg,
+          color,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          marginBottom: 12,
+          transform: "rotate(-4deg)",
+          boxShadow: `0 4px 10px ${color}22`,
+        }}
       >
-        <Icon className="w-5 h-5" />
+        <Icon size={20} strokeWidth={2.4} />
       </div>
       <p
-        className="text-[14px] font-extrabold leading-tight tracking-tight"
-        style={{ color: "#0F172A" }}
+        style={{
+          fontSize: 14,
+          fontWeight: 800,
+          letterSpacing: "-0.2px",
+          color: "#0F172A",
+        }}
       >
         {label}
       </p>
-      <p className="text-[11px] font-semibold text-slate-500 mt-0.5 leading-snug">
+      <p
+        style={{
+          fontSize: 11,
+          fontWeight: 600,
+          color: "#64748B",
+          marginTop: 2,
+          lineHeight: 1.35,
+        }}
+      >
         {helper}
       </p>
     </Link>
   );
 }
 
-function SlotPill({
-  slot,
+function SlotPanel({
+  slots,
+  liveSlot,
+  doneSlots,
+  pendingSlots,
 }: {
-  slot: { id: string; title: string; plannedStart?: string; status: string };
+  slots: SlotLite[];
+  liveSlot: SlotLite | undefined;
+  doneSlots: number;
+  pendingSlots: number;
 }) {
+  return (
+    <section
+      style={{
+        position: "relative",
+        overflow: "hidden",
+        borderRadius: 26,
+        background: "#fff",
+        padding: 16,
+        boxShadow: PILLOW,
+      }}
+    >
+      <DotScribbles color={PEACH} />
+      <div
+        style={{
+          display: "flex",
+          alignItems: "baseline",
+          justifyContent: "space-between",
+          marginBottom: 12,
+          position: "relative",
+          zIndex: 1,
+        }}
+      >
+        <div>
+          <p
+            style={{
+              fontSize: 10,
+              fontWeight: 800,
+              letterSpacing: "0.18em",
+              textTransform: "uppercase",
+              color: PEACH,
+            }}
+          >
+            Today's slots
+          </p>
+          <p
+            style={{
+              fontSize: 15,
+              fontWeight: 800,
+              letterSpacing: "-0.3px",
+              color: "#0F172A",
+            }}
+          >
+            {doneSlots} done · {liveSlot ? "1 live" : "0 live"} · {pendingSlots}{" "}
+            to come
+          </p>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          {liveSlot && (
+            <span
+              style={{
+                padding: "4px 10px",
+                borderRadius: 999,
+                fontSize: 10,
+                fontWeight: 800,
+                letterSpacing: "0.08em",
+                background: `${PEACH}22`,
+                color: PEACH,
+                transform: "rotate(-2deg)",
+              }}
+            >
+              {liveSlot.title} · live
+            </span>
+          )}
+          <Link
+            to="/daily-activities"
+            style={{ fontSize: 11, fontWeight: 700, color: NAVY }}
+          >
+            Open →
+          </Link>
+        </div>
+      </div>
+
+      <ol
+        className="snap-x"
+        style={{
+          display: "flex",
+          gap: 10,
+          overflowX: "auto",
+          paddingBottom: 4,
+          margin: "0 -4px",
+          paddingLeft: 4,
+          paddingRight: 4,
+          listStyle: "none",
+          position: "relative",
+          zIndex: 1,
+        }}
+      >
+        {slots.slice(0, 8).map((slot) => (
+          <SlotPill key={slot.id} slot={slot} />
+        ))}
+      </ol>
+    </section>
+  );
+}
+
+function SlotPill({ slot }: { slot: SlotLite }) {
   const isLive = slot.status === "in_progress";
   const isDone = slot.status === "done";
   const tone = isLive ? PEACH : isDone ? MINT : SKY;
   const label = isLive ? "LIVE" : isDone ? "DONE" : slot.status.toUpperCase();
   return (
     <li
-      className="snap-start min-w-[110px] rounded-xl px-3 py-2.5"
       style={{
+        scrollSnapAlign: "start",
+        minWidth: 124,
+        borderRadius: 18,
+        padding: "10px 12px",
         background: isLive
           ? `linear-gradient(135deg, ${PEACH}1f, ${PEACH}10)`
           : isDone
           ? "#F8FAFC"
           : "#FFFFFF",
-        border: isLive ? `0.6px solid ${PEACH}55` : "0.5px solid #E2E8F0",
+        border: isLive
+          ? `0.6px solid ${PEACH}55`
+          : "0.5px solid #E2E8F0",
+        boxShadow: isLive ? `0 6px 14px -6px ${PEACH}55` : "none",
       }}
     >
-      <p className="text-[10px] font-extrabold text-slate-500 tracking-wider">
+      <p
+        style={{
+          fontSize: 10,
+          fontWeight: 800,
+          letterSpacing: "0.10em",
+          color: "#64748B",
+        }}
+      >
         {slot.plannedStart || "—"}
       </p>
       <p
-        className="text-[13px] font-extrabold leading-tight tracking-tight mt-0.5"
-        style={{ color: "#0F172A" }}
+        style={{
+          marginTop: 2,
+          fontSize: 13,
+          fontWeight: 800,
+          letterSpacing: "-0.2px",
+          color: "#0F172A",
+          lineHeight: 1.2,
+        }}
       >
         {slot.title}
       </p>
       <div
-        className="mt-2 flex items-center gap-1.5 text-[9px] font-extrabold tracking-widest"
-        style={{ color: tone }}
+        style={{
+          marginTop: 8,
+          display: "flex",
+          alignItems: "center",
+          gap: 6,
+          fontSize: 9,
+          fontWeight: 800,
+          letterSpacing: "0.16em",
+          color: tone,
+        }}
       >
         <span
-          className="w-1.5 h-1.5 rounded-full"
           style={{
+            width: 6,
+            height: 6,
+            borderRadius: "50%",
             background: tone,
             boxShadow: isLive ? `0 0 6px ${tone}` : "none",
           }}
@@ -507,29 +890,351 @@ function SlotPill({
   );
 }
 
+interface PickupRecord {
+  status?: string;
+  pickerRelation?: string;
+}
+
+interface PickupsDoc {
+  records: Record<string, PickupRecord>;
+}
+
+interface RosterEntry {
+  id: string;
+  name?: string;
+}
+
+function PickupPanel({
+  roster,
+  pickups,
+  pickupsVerified,
+  pickupsPending,
+  limit,
+}: {
+  roster: RosterEntry[];
+  pickups: PickupsDoc | null | undefined;
+  pickupsVerified: number;
+  pickupsPending: number;
+  limit: number;
+}) {
+  const entries: [string, PickupRecord][] = pickups
+    ? Object.entries(pickups.records).slice(0, limit)
+    : [];
+  return (
+    <Link
+      to="/pickup"
+      style={{
+        position: "relative",
+        overflow: "hidden",
+        display: "block",
+        borderRadius: 26,
+        background: "#fff",
+        padding: 16,
+        boxShadow: PILLOW,
+        border: "1px solid rgba(16,185,129,0.18)",
+      }}
+      className="active:scale-[0.99] transition"
+    >
+      <DotScribbles color={MINT} />
+      <div
+        style={{
+          display: "flex",
+          alignItems: "baseline",
+          justifyContent: "space-between",
+          position: "relative",
+          zIndex: 1,
+        }}
+      >
+        <p
+          style={{
+            fontSize: 14,
+            fontWeight: 800,
+            letterSpacing: "-0.2px",
+            color: "#0F172A",
+          }}
+        >
+          🚸 Pickup queue
+        </p>
+        <span
+          style={{
+            padding: "3px 10px",
+            borderRadius: 999,
+            fontSize: 10,
+            fontWeight: 800,
+            letterSpacing: "0.08em",
+            textTransform: "uppercase",
+            background: `${MINT}22`,
+            color: MINT,
+            transform: "rotate(-2deg)",
+          }}
+        >
+          {pickupsVerified} confirmed
+        </span>
+      </div>
+      <p
+        style={{
+          fontSize: 11,
+          fontWeight: 600,
+          color: "#64748B",
+          marginTop: 4,
+          position: "relative",
+          zIndex: 1,
+        }}
+      >
+        {pickupsPending > 0
+          ? `${pickupsPending} pending verification`
+          : "All clear so far"}
+      </p>
+
+      <div
+        style={{
+          marginTop: 12,
+          display: "flex",
+          flexDirection: "column",
+          gap: 8,
+          position: "relative",
+          zIndex: 1,
+        }}
+      >
+        {entries.length > 0 ? (
+          entries.map(([id, rec]) => {
+            const child = roster.find((r) => r.id === id);
+            const verified = rec.status === "verified";
+            return (
+              <div
+                key={id}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 10,
+                }}
+              >
+                <CartoonAvatar
+                  name={child?.name || "child"}
+                  size={36}
+                  ringColor={verified ? MINT : BUTTER}
+                  ringWidth={2}
+                />
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <p
+                    style={{
+                      fontSize: 13,
+                      fontWeight: 700,
+                      color: "#0F172A",
+                      whiteSpace: "nowrap",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                    }}
+                  >
+                    {child?.name?.split(" ")[0] || "—"}
+                  </p>
+                  <p
+                    style={{
+                      fontSize: 11,
+                      fontWeight: 600,
+                      color: "#64748B",
+                    }}
+                  >
+                    {rec.pickerRelation || "Picker"} ·{" "}
+                    {verified ? "Verified" : "Pending"}
+                  </p>
+                </div>
+                <span
+                  style={{
+                    fontSize: 16,
+                    transform: "rotate(8deg)",
+                  }}
+                  aria-hidden
+                >
+                  {verified ? "✅" : "⏳"}
+                </span>
+              </div>
+            );
+          })
+        ) : (
+          <p style={{ fontSize: 12, fontWeight: 500, color: "#64748B" }}>
+            No pickups logged yet — open queue to set up.
+          </p>
+        )}
+      </div>
+    </Link>
+  );
+}
+
 function MiniAction({
   href,
   Icon,
   label,
   color,
+  badge,
+  urgent,
 }: {
   href: string;
-  Icon: React.ComponentType<{ className?: string }>;
+  Icon: React.ComponentType<{ size?: number; strokeWidth?: number; color?: string }>;
   label: string;
   color: string;
+  badge?: number;
+  urgent?: boolean;
 }) {
   return (
     <Link
       to={href}
-      className="rounded-2xl bg-white p-2.5 shadow-[0_2px_8px_rgba(15,23,42,0.05)] hover:shadow-md active:scale-95 transition flex flex-col items-center gap-1.5"
+      style={{
+        position: "relative",
+        borderRadius: 22,
+        background: "#fff",
+        padding: "12px 8px",
+        boxShadow: PILLOW,
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        gap: 6,
+        textAlign: "center",
+      }}
+      className="active:scale-95 hover:-translate-y-0.5 transition"
     >
       <span
-        className="w-9 h-9 rounded-xl flex items-center justify-center text-white"
-        style={{ background: color, boxShadow: `0 2px 6px ${color}55` }}
+        style={{
+          width: 40,
+          height: 40,
+          borderRadius: 14,
+          background: color,
+          boxShadow: `0 4px 10px ${color}55`,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          color: "#fff",
+          transform: "rotate(-4deg)",
+        }}
       >
-        <Icon className="w-4 h-4" />
+        <Icon size={18} strokeWidth={2.4} color="#fff" />
       </span>
-      <span className="text-[11px] font-bold text-slate-700">{label}</span>
+      <span style={{ fontSize: 11, fontWeight: 700, color: "#334155" }}>
+        {label}
+      </span>
+      {badge && badge > 0 ? (
+        <span
+          style={{
+            position: "absolute",
+            top: 4,
+            right: 6,
+            minWidth: 20,
+            height: 20,
+            padding: "0 6px",
+            borderRadius: 999,
+            background: urgent ? RED : NAVY,
+            color: "#fff",
+            fontSize: 10,
+            fontWeight: 800,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            boxShadow: urgent
+              ? `0 0 0 3px ${RED}33, 0 0 12px ${RED}66`
+              : "0 2px 6px rgba(0,0,0,0.18)",
+          }}
+          className={urgent ? "animate-pulse" : undefined}
+        >
+          {badge}
+        </span>
+      ) : null}
     </Link>
+  );
+}
+
+function ThemeStrip({ themeOfWeek }: { themeOfWeek: string }) {
+  return (
+    <section
+      style={{
+        position: "relative",
+        overflow: "hidden",
+        borderRadius: 22,
+        padding: "12px 14px",
+        display: "flex",
+        alignItems: "center",
+        gap: 12,
+        background: `linear-gradient(135deg, ${LAV}24, ${BLUSH}12)`,
+        boxShadow: PILLOW,
+      }}
+    >
+      <span
+        style={{
+          width: 38,
+          height: 38,
+          borderRadius: 14,
+          background: `linear-gradient(135deg, ${LAV}, #8B5CF6)`,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          color: "#fff",
+          flexShrink: 0,
+          transform: "rotate(-6deg)",
+          boxShadow: `0 6px 14px ${LAV}44`,
+        }}
+      >
+        <Sparkles size={18} strokeWidth={2.4} color="#fff" />
+      </span>
+      <div style={{ minWidth: 0, flex: 1 }}>
+        <p
+          style={{
+            fontSize: 10,
+            fontWeight: 800,
+            letterSpacing: "0.18em",
+            textTransform: "uppercase",
+            color: LAV,
+          }}
+        >
+          This week's theme
+        </p>
+        <p
+          style={{
+            fontSize: 13,
+            fontWeight: 800,
+            letterSpacing: "-0.2px",
+            color: "#0F172A",
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+          }}
+        >
+          {themeOfWeek}
+        </p>
+      </div>
+    </section>
+  );
+}
+
+function DotScribbles({
+  color,
+  dense = false,
+}: {
+  color: string;
+  dense?: boolean;
+}) {
+  return (
+    <svg
+      aria-hidden="true"
+      width="100%"
+      height="100%"
+      style={{
+        position: "absolute",
+        inset: 0,
+        opacity: dense ? 0.10 : 0.07,
+        pointerEvents: "none",
+      }}
+    >
+      <circle cx="14%" cy="24%" r="2.5" fill={color} />
+      <circle cx="82%" cy="14%" r="1.8" fill={color} />
+      <circle cx="68%" cy="62%" r="2" fill={color} />
+      <circle cx="22%" cy="80%" r="1.6" fill={color} />
+      <circle cx="48%" cy="32%" r="1.4" fill={color} />
+      {dense && (
+        <>
+          <circle cx="90%" cy="80%" r="2.2" fill={color} />
+          <circle cx="6%" cy="60%" r="1.4" fill={color} />
+          <circle cx="55%" cy="88%" r="1.6" fill={color} />
+        </>
+      )}
+    </svg>
   );
 }

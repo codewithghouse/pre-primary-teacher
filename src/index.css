@@ -52,8 +52,18 @@
   * {
     @apply border-border;
   }
+  html,
   body {
-    @apply bg-background text-foreground font-sans antialiased;
+    font-family: "SF Pro Display", -apple-system, BlinkMacSystemFont,
+      "SF Pro Text", "Inter", system-ui, sans-serif;
+    font-weight: 400;
+    font-feature-settings: "ss01", "cv11";
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
     /* Respect iOS safe-area for notch / Dynamic Island devices */
     padding-top: env(safe-area-inset-top);
     padding-bottom: env(safe-area-inset-bottom);

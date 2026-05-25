@@ -15,11 +15,12 @@ export default {
     extend: {
       fontFamily: {
         sans: [
+          '"SF Pro Display"',
           "-apple-system",
           "BlinkMacSystemFont",
-          '"SF Pro Display"',
           '"SF Pro Text"',
           "Inter",
+          "system-ui",
           "sans-serif",
         ],
       },
