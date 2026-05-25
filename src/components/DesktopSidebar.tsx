@@ -17,7 +17,6 @@ import {
   PhoneCall,
   Settings as SettingsIcon,
   User as UserIcon,
-  Sprout,
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -111,8 +110,12 @@ export function DesktopSidebar({ isOpen, onClose }: AppSidebarProps) {
       {/* Brand */}
       <div className="px-5 pt-6 pb-5 border-b border-white/10 relative">
         <div className="flex items-center gap-2.5">
-          <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center">
-            <Sprout className="w-5 h-5 text-edu-green" />
+          <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center overflow-hidden p-1">
+            <img
+              src="/edullent-icon.png"
+              alt="Edullent"
+              className="w-full h-full object-contain"
+            />
           </div>
           <div className="leading-tight">
             <div className="text-[10px] font-bold uppercase tracking-wider text-white/60">

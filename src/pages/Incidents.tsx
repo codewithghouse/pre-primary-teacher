@@ -78,10 +78,24 @@ export default function Incidents() {
   const [searchParams, setSearchParams] = useSearchParams();
   const { primaryClass, loading: classLoading } = useTeacherClass();
   const { roster } = useClassRoster(primaryClass?.id);
-  const { incidents, loading: incLoading, addIncident } = usePPIncidents(
-    primaryClass?.id
-  );
+  const { incidents, loading: incLoading, addIncident, resolveIncident } =
+    usePPIncidents(primaryClass?.id);
   const isDesktop = useIsDesktop();
+  const [resolvingId, setResolvingId] = useState<string | null>(null);
+
+  const handleResolve = async (id: string, firstName: string) => {
+    setResolvingId(id);
+    try {
+      await resolveIncident(id);
+      toast.success(`Marked resolved for ${firstName}`);
+    } catch (e) {
+      console.error("[Incidents] resolve failed:", e);
+      const msg = e instanceof Error ? e.message : String(e);
+      toast.error(`Could not resolve: ${msg.slice(0, 140)}`);
+    } finally {
+      setResolvingId(null);
+    }
+  };
 
   const [search, setSearch] = useState("");
   const [filterChild, setFilterChild] = useState<string>("");
@@ -663,6 +677,13 @@ export default function Incidents() {
                     incident={inc}
                     child={child}
                     pulse={justSavedAt !== null && i === 0}
+                    resolving={resolvingId === inc.id}
+                    onResolve={() =>
+                      handleResolve(
+                        inc.id,
+                        (child?.name || inc.studentName).split(" ")[0]
+                      )
+                    }
                   />
                 </li>
               );
@@ -878,10 +899,14 @@ function IncidentCard({
   incident,
   child,
   pulse,
+  resolving,
+  onResolve,
 }: {
   incident: Incident;
   child: { name: string } | undefined;
   pulse: boolean;
+  resolving: boolean;
+  onResolve: () => void;
 }) {
   const sev = SEV_TONE[incident.severity];
   return (
@@ -1045,6 +1070,44 @@ function IncidentCard({
           </span>
         )}
       </div>
+
+      {/* Resolve action — only when not yet handled */}
+      {!incident.handled && (
+        <button
+          type="button"
+          onClick={onResolve}
+          disabled={resolving}
+          style={{
+            position: "relative",
+            zIndex: 1,
+            width: "100%",
+            marginTop: 8,
+            padding: "10px 14px",
+            borderRadius: 14,
+            background: resolving
+              ? "#CBD5E1"
+              : `linear-gradient(135deg, ${MINT}, #059669)`,
+            color: "#fff",
+            fontSize: 12,
+            fontWeight: 800,
+            border: "none",
+            cursor: resolving ? "default" : "pointer",
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 6,
+            boxShadow: resolving ? "none" : `0 8px 18px -6px ${MINT}66`,
+          }}
+          className="active:scale-95 hover:-translate-y-0.5 transition"
+        >
+          {resolving ? (
+            <Loader2 size={13} className="animate-spin" />
+          ) : (
+            <CheckCircle2 size={13} strokeWidth={2.6} />
+          )}
+          Mark resolved
+        </button>
+      )}
     </div>
   );
 }

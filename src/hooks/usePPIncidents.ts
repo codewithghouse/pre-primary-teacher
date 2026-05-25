@@ -1,15 +1,17 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   collection,
+  doc,
   onSnapshot,
   orderBy,
   query,
   serverTimestamp,
+  updateDoc,
   where,
   limit as fbLimit,
   type DocumentData,
 } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { auth, db } from "@/lib/firebase";
 import { auditedAdd } from "@/lib/auditedWrites";
 import { useAuth } from "@/lib/AuthContext";
 
@@ -179,5 +181,20 @@ export function usePPIncidents(classId: string | null | undefined) {
     [classId, teacherData]
   );
 
-  return { incidents, loading, addIncident };
+  // Teacher-side "Mark resolved" — flips handled true + writes handledBy
+  // (auth.uid) + handledAt (ISO). Rule allows this narrow whitelist for
+  // staff so teachers can close incidents from their side. Cannot reopen.
+  const resolveIncident = useCallback(async (incidentId: string) => {
+    const uid = auth.currentUser?.uid;
+    if (!uid) throw new Error("Not signed in");
+    await updateDoc(doc(db, "pp_incidents", incidentId), {
+      handled: true,
+      handledBy: uid,
+      handledAt: new Date().toISOString(),
+      _lastModifiedBy: uid,
+      _lastModifiedAt: serverTimestamp(),
+    });
+  }, []);
+
+  return { incidents, loading, addIncident, resolveIncident };
 }
