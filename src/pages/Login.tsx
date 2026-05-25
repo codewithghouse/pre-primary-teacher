@@ -1,7 +1,22 @@
+/**
+ * Login.tsx — Pre-primary teacher Google sign-in.
+ * Cartoonified 2026-05-25. Light sherbet shell + Edullent logo brand mark.
+ */
 import { useState } from "react";
 import { useAuth } from "@/lib/AuthContext";
-import { Button } from "@/components/ui/button";
-import { Sprout, AlertCircle, Loader2 } from "lucide-react";
+import { AlertCircle, Loader2 } from "lucide-react";
+
+const NAVY = "#1e3272";
+const MINT = "#10B981";
+const PEACH = "#FB923C";
+const BLUSH = "#EC4899";
+const SKY = "#0EA5E9";
+const LAV = "#A78BFA";
+const BUTTER = "#F59E0B";
+const RED = "#EF4444";
+
+const PILLOW =
+  "0 1px 0 rgba(255,255,255,0.55) inset, 0 14px 32px -10px rgba(30,50,114,0.16), 0 4px 10px rgba(30,50,114,0.06)";
 
 interface LoginProps {
   authError?: string | null;
@@ -16,11 +31,6 @@ export default function Login({ authError }: LoginProps) {
     try {
       await loginWithGoogle();
     } catch (err) {
-      // AuthContext surfaces the error via the error banner above the
-      // button — we just log here for debug. Common causes:
-      //   • Popup blocked by browser → check address-bar icon
-      //   • Domain not in Firebase Auth Authorized Domains list
-      //   • User closed the popup
       console.error("[Login] sign-in failed:", err);
     } finally {
       setSigningIn(false);
@@ -28,71 +38,272 @@ export default function Login({ authError }: LoginProps) {
   };
 
   return (
-    <div className="min-h-screen bg-edu-navy flex flex-col">
-      <div className="flex-1 flex flex-col items-center justify-center px-6 py-12">
-        <div className="w-full max-w-sm">
+    <div
+      style={{
+        minHeight: "100vh",
+        background:
+          "linear-gradient(180deg, #EEF4FF 0%, #F8FAFF 40%, #FFE0EC 100%)",
+        display: "flex",
+        flexDirection: "column",
+        padding: "32px 20px",
+      }}
+    >
+      <div
+        style={{
+          flex: 1,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <div style={{ width: "100%", maxWidth: 400 }}>
           {/* Brand */}
-          <div className="flex flex-col items-center text-center mb-10">
-            <div className="w-20 h-20 rounded-3xl bg-white/10 backdrop-blur flex items-center justify-center mb-5 shadow-2xl">
-              <Sprout className="w-10 h-10 text-edu-green" />
+          <div style={{ textAlign: "center", marginBottom: 28 }}>
+            {/* Edullent logo chip */}
+            <div
+              style={{
+                width: 80,
+                height: 80,
+                margin: "0 auto",
+                borderRadius: 24,
+                background: NAVY,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                padding: 10,
+                boxShadow: `0 14px 32px -8px ${NAVY}66`,
+                position: "relative",
+              }}
+            >
+              <img
+                src="/edullent-icon.png"
+                alt="Edullent"
+                style={{ width: "100%", height: "100%", objectFit: "contain" }}
+              />
+              {/* Floating sticker */}
+              <span
+                aria-hidden
+                style={{
+                  position: "absolute",
+                  top: -10,
+                  right: -10,
+                  width: 34,
+                  height: 34,
+                  borderRadius: 999,
+                  background: `linear-gradient(135deg, ${BUTTER}, ${PEACH})`,
+                  color: "#fff",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: 16,
+                  boxShadow: `0 6px 14px ${BUTTER}66`,
+                  transform: "rotate(12deg)",
+                  border: "3px solid #fff",
+                }}
+              >
+                🌱
+              </span>
             </div>
-            <h1 className="text-2xl font-black text-white tracking-tight">
+            <p
+              style={{
+                fontSize: 11,
+                fontWeight: 800,
+                letterSpacing: "0.16em",
+                textTransform: "uppercase",
+                color: SKY,
+                marginTop: 16,
+              }}
+            >
               Edullent
-            </h1>
-            <p className="text-sm text-white/60 font-semibold uppercase tracking-widest mt-1">
-              Pre-Primary Teacher
             </p>
-            <p className="text-xs text-white/50 mt-4 max-w-xs leading-relaxed">
-              Daily moments, milestones, and trust — for Playgroup, Nursery, LKG, UKG teachers.
+            <h1
+              style={{
+                fontSize: 28,
+                fontWeight: 800,
+                color: NAVY,
+                letterSpacing: "-0.6px",
+                marginTop: 2,
+              }}
+            >
+              Pre-Primary{" "}
+              <span
+                aria-hidden
+                style={{ display: "inline-block", transform: "rotate(-6deg)" }}
+              >
+                🎒
+              </span>
+            </h1>
+            <p
+              style={{
+                fontSize: 12,
+                fontWeight: 700,
+                color: NAVY,
+                opacity: 0.7,
+                marginTop: 4,
+              }}
+            >
+              Teacher dashboard
+            </p>
+            <p
+              style={{
+                fontSize: 12,
+                color: "#64748B",
+                marginTop: 12,
+                maxWidth: 300,
+                margin: "12px auto 0",
+                lineHeight: 1.55,
+              }}
+            >
+              Daily moments, milestones, and trust — for Playgroup, Nursery, LKG,
+              UKG teachers.
             </p>
           </div>
 
-          {/* Error banner */}
-          {authError && (
-            <div className="mb-5 flex items-start gap-2 bg-edu-red/10 border border-edu-red/30 text-white text-xs rounded-xl p-3">
-              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-edu-red" />
-              <span className="leading-relaxed">{authError}</span>
-            </div>
-          )}
-
-          {/* Sign-in CTA */}
-          <Button
-            onClick={handleSignIn}
-            disabled={signingIn}
-            size="lg"
-            className="w-full bg-white text-edu-navy hover:bg-white/95 shadow-xl"
+          {/* Card with sign-in */}
+          <div
+            style={{
+              position: "relative",
+              overflow: "hidden",
+              borderRadius: 28,
+              padding: 22,
+              background: "#fff",
+              boxShadow: PILLOW,
+            }}
           >
-            {signingIn ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                Signing in...
-              </>
-            ) : (
-              <>
-                <GoogleIcon />
-                Sign in with Google
-              </>
-            )}
-          </Button>
+            <DotScribbles color={SKY} dense />
+            <div style={{ position: "relative", zIndex: 1 }}>
+              {/* Error banner */}
+              {authError && (
+                <div
+                  style={{
+                    position: "relative",
+                    overflow: "hidden",
+                    marginBottom: 14,
+                    padding: "10px 12px",
+                    borderRadius: 14,
+                    background:
+                      "linear-gradient(135deg, #FFD6D6 0%, #FFF1F1 100%)",
+                    boxShadow: `inset 0 0 0 1px ${RED}33`,
+                    display: "flex",
+                    alignItems: "flex-start",
+                    gap: 8,
+                  }}
+                >
+                  <DotScribbles color={RED} />
+                  <AlertCircle
+                    size={14}
+                    strokeWidth={2.4}
+                    color={RED}
+                    style={{
+                      flexShrink: 0,
+                      marginTop: 2,
+                      position: "relative",
+                      zIndex: 1,
+                    }}
+                  />
+                  <span
+                    style={{
+                      position: "relative",
+                      zIndex: 1,
+                      fontSize: 11,
+                      fontWeight: 600,
+                      color: "#0F172A",
+                      lineHeight: 1.5,
+                    }}
+                  >
+                    {authError}
+                  </span>
+                </div>
+              )}
 
-          <p className="text-[11px] text-white/40 text-center mt-5 leading-relaxed">
-            Use the Google account registered by your principal.
-            <br />
-            Need access? Contact your school principal.
-          </p>
+              {/* Sign-in pillow */}
+              <button
+                type="button"
+                onClick={handleSignIn}
+                disabled={signingIn}
+                style={{
+                  width: "100%",
+                  padding: "14px 18px",
+                  borderRadius: 18,
+                  background: signingIn
+                    ? "#CBD5E1"
+                    : `linear-gradient(135deg, ${SKY}, #0284C7)`,
+                  color: "#fff",
+                  fontSize: 14,
+                  fontWeight: 800,
+                  letterSpacing: "-0.1px",
+                  border: "none",
+                  cursor: signingIn ? "default" : "pointer",
+                  boxShadow: signingIn
+                    ? "none"
+                    : `0 12px 28px -8px ${SKY}88`,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 10,
+                }}
+                className="active:scale-95 hover:-translate-y-0.5 transition"
+              >
+                {signingIn ? (
+                  <>
+                    <Loader2 size={16} className="animate-spin" />
+                    Signing in…
+                  </>
+                ) : (
+                  <>
+                    <GoogleIcon />
+                    Sign in with Google
+                  </>
+                )}
+              </button>
+
+              <p
+                style={{
+                  fontSize: 11,
+                  color: "#64748B",
+                  textAlign: "center",
+                  marginTop: 14,
+                  lineHeight: 1.55,
+                }}
+              >
+                Use the Google account registered by your principal.
+                <br />
+                Need access? Contact your school principal.
+              </p>
+            </div>
+          </div>
         </div>
       </div>
 
-      <div className="text-center pb-6">
+      {/* Footer */}
+      <div style={{ textAlign: "center", paddingTop: 20 }}>
         <a
           href="/setup"
-          className="text-[10px] text-white/50 underline hover:text-white/80"
+          style={{
+            fontSize: 11,
+            color: NAVY,
+            opacity: 0.7,
+            fontWeight: 700,
+            textDecoration: "underline",
+            textDecorationStyle: "dotted",
+            textUnderlineOffset: 3,
+          }}
+          className="hover:opacity-100"
         >
-          Principal? Set up a pre-primary teacher →
+          🔑 Principal? Set up a pre-primary teacher →
         </a>
-        <div className="text-[10px] text-white/30 uppercase tracking-widest mt-2">
+        <p
+          style={{
+            fontSize: 10,
+            color: "#94A3B8",
+            fontWeight: 700,
+            letterSpacing: "0.14em",
+            textTransform: "uppercase",
+            marginTop: 8,
+          }}
+        >
           Powered by Edullent · v0.1
-        </div>
+        </p>
       </div>
     </div>
   );
@@ -100,7 +311,7 @@ export default function Login({ authError }: LoginProps) {
 
 function GoogleIcon() {
   return (
-    <svg className="w-4 h-4" viewBox="0 0 24 24">
+    <svg width={16} height={16} viewBox="0 0 24 24">
       <path
         fill="#4285F4"
         d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
@@ -120,3 +331,43 @@ function GoogleIcon() {
     </svg>
   );
 }
+
+function DotScribbles({
+  color,
+  dense = false,
+}: {
+  color: string;
+  dense?: boolean;
+}) {
+  return (
+    <svg
+      aria-hidden="true"
+      width="100%"
+      height="100%"
+      style={{
+        position: "absolute",
+        inset: 0,
+        opacity: dense ? 0.1 : 0.07,
+        pointerEvents: "none",
+      }}
+    >
+      <circle cx="14%" cy="24%" r="2.5" fill={color} />
+      <circle cx="82%" cy="14%" r="1.8" fill={color} />
+      <circle cx="68%" cy="62%" r="2" fill={color} />
+      <circle cx="22%" cy="80%" r="1.6" fill={color} />
+      <circle cx="48%" cy="32%" r="1.4" fill={color} />
+      {dense && (
+        <>
+          <circle cx="90%" cy="80%" r="2.2" fill={color} />
+          <circle cx="6%" cy="60%" r="1.4" fill={color} />
+          <circle cx="55%" cy="88%" r="1.6" fill={color} />
+        </>
+      )}
+    </svg>
+  );
+}
+
+// Palette constants reserved for future variants on this page.
+void MINT;
+void BLUSH;
+void LAV;

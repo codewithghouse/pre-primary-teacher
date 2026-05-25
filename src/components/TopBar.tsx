@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { useAuth } from "@/lib/AuthContext";
-import { Sprout, Menu } from "lucide-react";
+import { Menu } from "lucide-react";
 
 interface TopBarProps {
   onMenuClick?: () => void;
@@ -33,8 +33,12 @@ export function TopBar({ onMenuClick }: TopBarProps) {
               <Menu className="w-5 h-5" />
             </button>
           )}
-          <div className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center shrink-0">
-            <Sprout className="w-5 h-5 text-edu-green" />
+          <div className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center shrink-0 overflow-hidden p-1">
+            <img
+              src="/edullent-icon.png"
+              alt="Edullent"
+              className="w-full h-full object-contain"
+            />
           </div>
           <div className="leading-tight min-w-0">
             <div className="text-[10px] font-bold uppercase tracking-wider text-white/60">

@@ -11,8 +11,12 @@ export function PageLoader() {
 export function AuthLoader() {
   return (
     <div className="min-h-screen bg-edu-navy flex flex-col items-center justify-center gap-4 text-white">
-      <div className="w-16 h-16 rounded-3xl bg-white/10 flex items-center justify-center text-3xl animate-bounce">
-        🌱
+      <div className="w-16 h-16 rounded-3xl bg-white/10 flex items-center justify-center p-2 animate-bounce">
+        <img
+          src="/edullent-icon.png"
+          alt="Edullent"
+          className="w-full h-full object-contain"
+        />
       </div>
       <div className="flex flex-col items-center gap-1">
         <Loader2 className="w-6 h-6 animate-spin text-edu-blue" />
