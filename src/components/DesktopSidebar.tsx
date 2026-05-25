@@ -17,6 +17,7 @@ import {
   PhoneCall,
   Settings as SettingsIcon,
   User as UserIcon,
+  FileText,
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -72,6 +73,7 @@ const GROUPS: NavGroup[] = [
       { to: "/notices", label: "Class Notices", icon: Megaphone },
       { to: "/events", label: "Class Events", icon: CalendarIcon },
       { to: "/photos", label: "Photo Studio", icon: ImageIcon },
+      { to: "/reports", label: "Daily Reports", icon: FileText },
     ],
   },
   {

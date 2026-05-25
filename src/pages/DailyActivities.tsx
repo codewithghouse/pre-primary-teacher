@@ -87,9 +87,16 @@ export default function DailyActivities() {
     };
   }, [editingSlotId]);
 
-  if (classLoading || loading) return <CenteredLoader label="Loading today's activities…" />;
+  if (classLoading) {
+    return <CenteredLoader label="Resolving your class…" />;
+  }
 
-  if (!primaryClass || !data) {
+  // "No class assigned" must only trigger when primaryClass is truly missing
+  // — NOT when daily-activities data is still loading. Previously a single
+  // `!primaryClass || !data` check conflated the two and showed the empty
+  // state during the brief race between primaryClass landing and the
+  // pp_daily_activities snapshot firing (visible in 2026-05-25 bug report).
+  if (!primaryClass) {
     return (
       <div style={{ padding: "48px 16px", textAlign: "center" }}>
         <p style={{ fontSize: 16, fontWeight: 800, color: NAVY }}>
@@ -97,6 +104,10 @@ export default function DailyActivities() {
         </p>
       </div>
     );
+  }
+
+  if (loading || !data) {
+    return <CenteredLoader label="Loading today's activities…" />;
   }
 
   const slots = data.slots;

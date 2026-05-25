@@ -1,8 +1,12 @@
 import { useEffect, useState, useCallback } from "react";
 import {
+  collection,
   doc,
+  limit as fbLimit,
   onSnapshot,
+  query,
   serverTimestamp,
+  where,
   type DocumentData,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -61,27 +65,59 @@ export function usePPDailyActivities(classId: string | null | undefined) {
       setLoading(false);
       return;
     }
-    const ref = doc(db, "pp_daily_activities", ppDailyDocId(today, classId));
+    const schoolId = teacherData.schoolId;
+
+    // Use a LIST query (rule: `allow list: if signedIn()`) instead of a
+    // single-doc GET (rule: `allow get: if signedIn() && inSameSchool()`).
+    //
+    // Why: the GET rule's `inSameSchool()` predicate reads
+    // `resource.data.schoolId` — which evaluates to null/false when the doc
+    // doesn't exist. So a GET on a not-yet-created `pp_daily_activities/
+    // {today_classId}` doc gets denied with "Missing or insufficient
+    // permissions", which crashes onSnapshot before the empty-snapshot
+    // branch can render the default template.
+    //
+    // LIST queries don't trigger the per-doc rule, so an empty result is
+    // fine. The query targets the same deterministic doc anyway via
+    // (classId == X AND date == today) — the existing composite index
+    // (classId+date DESC) covers it without a new index.
+    const q = query(
+      collection(db, "pp_daily_activities"),
+      where("classId", "==", classId),
+      where("date", "==", today),
+      fbLimit(1)
+    );
+
+    const fallbackTemplate = (): PPDailyActivities => ({
+      date: today,
+      classId,
+      schoolId,
+      slots: DEFAULT_TEMPLATE,
+      reportStatus: "unpublished",
+    });
+
     const unsub = onSnapshot(
-      ref,
+      q,
       (snap) => {
-        if (snap.exists()) {
-          setData(snap.data() as PPDailyActivities);
+        if (!snap.empty) {
+          setData(snap.docs[0].data() as PPDailyActivities);
         } else {
           // No doc yet → initialise in-memory with the default template.
-          // First write will materialise it.
-          setData({
-            date: today,
-            classId,
-            schoolId: teacherData.schoolId!,
-            slots: DEFAULT_TEMPLATE,
-            reportStatus: "unpublished",
-          });
+          // First write will materialise it via the CREATE rule (which
+          // checks `request.resource.data` not `resource.data`, so it
+          // succeeds even on first-time create).
+          setData(fallbackTemplate());
         }
         setLoading(false);
       },
       (err) => {
+        // Safety net: even if the LIST query errors (rules tightening
+        // mid-flight, network blip, etc.), fall back to the default
+        // template so the teacher can still see + log slots. Writes go
+        // through the CREATE rule which doesn't depend on existing
+        // resource state.
         console.error("[usePPDailyActivities]", err);
+        setData(fallbackTemplate());
         setLoading(false);
       }
     );
