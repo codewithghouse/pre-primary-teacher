@@ -1,8 +1,5 @@
 import { useState } from "react";
-import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
-import { Check, Smile, Loader2 } from "lucide-react";
+import { Check, Loader2, Sparkles, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { useTeacherClass } from "@/hooks/useTeacherClass";
 import { useClassRoster, type RosterChild } from "@/hooks/useClassRoster";
@@ -12,13 +9,33 @@ import {
   type AttendanceStatus,
 } from "@/hooks/useTodayAttendance";
 import { useAuth } from "@/lib/AuthContext";
+import { useIsDesktop } from "@/hooks/useIsDesktop";
+import { CartoonAvatar } from "@/components/CartoonAvatar";
+
+/* ═══════════════════════════════════════════════════════════════════════
+   PRE-PRIMARY TEACHER · ATTENDANCE & MOOD
+   Storybook-sherbet attendance grid. Tap = present + open mood sheet.
+   Long-press = absent. Cartoon avatars, sticker checkmarks, pillow cards.
+   ════════════════════════════════════════════════════════════════════════ */
+
+const NAVY = "#1e3272";
+const MINT = "#10B981";
+const PEACH = "#FB923C";
+const BLUSH = "#EC4899";
+const SKY = "#0EA5E9";
+const LAV = "#A78BFA";
+const BUTTER = "#F59E0B";
+const RED = "#EF4444";
+
+const PILLOW =
+  "0 1px 0 rgba(255,255,255,0.55) inset, 0 14px 32px -10px rgba(30,50,114,0.16), 0 4px 10px rgba(30,50,114,0.06)";
 
 const MOODS = [
-  { key: "happy", emoji: "😊", label: "Happy", color: "bg-mood-happy" },
-  { key: "ok", emoji: "😐", label: "OK", color: "bg-mood-ok" },
-  { key: "crying", emoji: "😢", label: "Crying", color: "bg-mood-crying" },
-  { key: "sleepy", emoji: "😴", label: "Sleepy", color: "bg-mood-sleepy" },
-  { key: "unwell", emoji: "🤒", label: "Unwell", color: "bg-mood-unwell" },
+  { key: "happy", emoji: "😊", label: "Happy", tone: MINT },
+  { key: "ok", emoji: "😐", label: "OK", tone: SKY },
+  { key: "crying", emoji: "😢", label: "Crying", tone: BUTTER },
+  { key: "sleepy", emoji: "😴", label: "Sleepy", tone: LAV },
+  { key: "unwell", emoji: "🤒", label: "Unwell", tone: RED },
 ] as const;
 
 export default function Attendance() {
@@ -30,10 +47,10 @@ export default function Attendance() {
   );
   const [moodSheetFor, setMoodSheetFor] = useState<string | null>(null);
   const [busyIds, setBusyIds] = useState<Set<string>>(new Set());
+  const isDesktop = useIsDesktop();
 
   const loading = classLoading || rosterLoading || attLoading;
 
-  // S2 class-teacher gate (mirrors teacher-dashboard MarkAttendance).
   const classTeacherEmail = (primaryClass?.classTeacherEmail || "").toLowerCase();
   const myEmailLower = (teacherData?.email || "").toLowerCase();
   const classHasDesignation = classTeacherEmail.length > 0;
@@ -62,7 +79,6 @@ export default function Attendance() {
     }
     const current = records[child.id]?.status;
     if (current === "absent" || current === "present" || current === "late") {
-      // Already marked — just open mood sheet to update mood
       setMoodSheetFor(child.id);
       return;
     }
@@ -136,10 +152,9 @@ export default function Attendance() {
 
   const bulkMarkRemaining = async () => {
     if (showGate) return;
-    const pending = roster.filter((c) => {
-      const status = records[c.id]?.status || "none";
-      return status === "none";
-    });
+    const pending = roster.filter(
+      (c) => (records[c.id]?.status || "none") === "none"
+    );
     if (!pending.length) return;
     toast.loading(`Marking ${pending.length} remaining…`, { id: "bulk" });
     const results = await Promise.allSettled(
@@ -160,27 +175,40 @@ export default function Attendance() {
     if (failed === 0) {
       toast.success(`${pending.length} marked happy 😊`, { id: "bulk" });
     } else {
-      toast.error(`${pending.length - failed}/${pending.length} saved. ${failed} failed.`, {
-        id: "bulk",
-      });
+      toast.error(
+        `${pending.length - failed}/${pending.length} saved. ${failed} failed.`,
+        { id: "bulk" }
+      );
     }
   };
 
   if (loading && roster.length === 0) {
     return (
-      <div className="px-4 py-12 flex flex-col items-center text-muted-foreground gap-3">
-        <Loader2 className="w-6 h-6 animate-spin" />
-        <p className="text-xs">Loading class…</p>
+      <div
+        style={{
+          padding: "48px 16px",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          gap: 12,
+          color: "#64748B",
+        }}
+      >
+        <Loader2 className="animate-spin" />
+        <p style={{ fontSize: 12, fontWeight: 600 }}>Loading class…</p>
       </div>
     );
   }
 
   if (!primaryClass) {
     return (
-      <div className="px-4 py-12 text-center">
-        <p className="text-sm font-bold text-edu-navy">No class assigned</p>
-        <p className="text-xs text-muted-foreground mt-1">
-          Ask your principal to assign you to a Playgroup / Nursery / LKG / UKG class.
+      <div style={{ padding: "48px 16px", textAlign: "center" }}>
+        <p style={{ fontSize: 16, fontWeight: 800, color: NAVY }}>
+          🌱 No class assigned
+        </p>
+        <p style={{ fontSize: 12, color: "#64748B", marginTop: 6 }}>
+          Ask your principal to assign you to a Playgroup / Nursery / LKG / UKG
+          class.
         </p>
       </div>
     );
@@ -189,7 +217,8 @@ export default function Attendance() {
   const stats = roster.reduce(
     (acc, c) => {
       const status = (records[c.id]?.status || "none") as AttendanceStatus;
-      if (status === "present" || status === "late" || status === "half-day") acc.present++;
+      if (status === "present" || status === "late" || status === "half-day")
+        acc.present++;
       else if (status === "absent") acc.absent++;
       else acc.pending++;
       return acc;
@@ -200,47 +229,162 @@ export default function Attendance() {
   const sheetChild = moodSheetFor ? roster.find((c) => c.id === moodSheetFor) : null;
   const sheetMood = sheetChild ? records[sheetChild.id]?.mood : undefined;
 
+  const gridCols = isDesktop ? "repeat(6, minmax(0, 1fr))" : "repeat(3, minmax(0, 1fr))";
+
   return (
-    <div className="px-4 py-4 space-y-4 animate-fade-in">
-      <div>
-        <h1 className="text-xl font-black text-edu-navy">Attendance & Mood</h1>
-        <p className="text-xs text-muted-foreground mt-0.5">
-          {primaryClass.name} · Tap to mark + capture arrival mood. Long-press for absent.
-        </p>
-      </div>
+    <div
+      className="animate-fade-in"
+      style={{
+        padding: isDesktop ? "24px 28px 80px" : "16px 16px 80px",
+        display: "flex",
+        flexDirection: "column",
+        gap: 16,
+        width: "100%",
+      }}
+    >
+      <header
+        style={{
+          display: "flex",
+          alignItems: isDesktop ? "center" : "flex-start",
+          justifyContent: "space-between",
+          gap: 12,
+          flexDirection: isDesktop ? "row" : "column",
+        }}
+      >
+        <div>
+          <h1
+            style={{
+              fontSize: isDesktop ? 26 : 20,
+              fontWeight: 800,
+              letterSpacing: "-0.6px",
+              color: NAVY,
+            }}
+          >
+            Attendance & Mood{" "}
+            <span
+              aria-hidden
+              style={{ display: "inline-block", transform: "rotate(-6deg)" }}
+            >
+              🌤️
+            </span>
+          </h1>
+          <p
+            style={{
+              fontSize: isDesktop ? 13 : 12,
+              fontWeight: 500,
+              color: "#64748B",
+              marginTop: 2,
+            }}
+          >
+            {primaryClass.name} · Tap to mark + capture arrival mood. Long-press
+            for absent.
+          </p>
+        </div>
+
+        {isDesktop && !showGate && stats.pending > 0 && (
+          <BulkButton onClick={bulkMarkRemaining} count={stats.pending} />
+        )}
+      </header>
 
       {showGate && (
-        <Card className="bg-edu-light-yellow border-edu-yellow">
-          <CardContent className="p-3 text-xs text-foreground">
+        <div
+          style={{
+            position: "relative",
+            overflow: "hidden",
+            borderRadius: 22,
+            padding: "12px 16px",
+            background: `linear-gradient(135deg, ${BUTTER}1f, ${PEACH}10)`,
+            border: `1px solid ${BUTTER}55`,
+            boxShadow: PILLOW,
+            display: "flex",
+            gap: 10,
+            alignItems: "center",
+          }}
+        >
+          <span
+            style={{
+              width: 36,
+              height: 36,
+              borderRadius: 12,
+              background: `linear-gradient(135deg, ${BUTTER}, ${PEACH})`,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              color: "#fff",
+              boxShadow: `0 6px 14px ${BUTTER}55`,
+              flexShrink: 0,
+              transform: "rotate(-6deg)",
+            }}
+          >
+            <AlertTriangle size={18} strokeWidth={2.4} />
+          </span>
+          <p style={{ fontSize: 12, fontWeight: 600, color: "#0F172A" }}>
             <strong>Read-only:</strong> Only{" "}
-            <strong>{primaryClass.classTeacherName || "the class teacher"}</strong> can mark daily attendance for this class.
-          </CardContent>
-        </Card>
+            <strong>
+              {primaryClass.classTeacherName || "the class teacher"}
+            </strong>{" "}
+            can mark daily attendance for this class.
+          </p>
+        </div>
       )}
 
-      <div className="grid grid-cols-3 gap-2">
-        <Counter label="Present" value={stats.present} color="text-edu-green" />
-        <Counter label="Absent" value={stats.absent} color="text-edu-red" />
-        <Counter label="Pending" value={stats.pending} color="text-muted-foreground" />
+      {/* Counter strip */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+          gap: 10,
+        }}
+      >
+        <CounterCard
+          label="Present"
+          value={stats.present}
+          emoji="🌤️"
+          tone={MINT}
+          surface="linear-gradient(135deg, #C9F5DE 0%, #F0FBF5 100%)"
+        />
+        <CounterCard
+          label="Absent"
+          value={stats.absent}
+          emoji="📭"
+          tone={RED}
+          surface="linear-gradient(135deg, #FFD6D6 0%, #FFF1F1 100%)"
+        />
+        <CounterCard
+          label="Pending"
+          value={stats.pending}
+          emoji="⏳"
+          tone={NAVY}
+          surface="linear-gradient(135deg, #E1ECFF 0%, #F7FAFF 100%)"
+        />
       </div>
 
-      {!showGate && stats.pending > 0 && (
-        <Button onClick={bulkMarkRemaining} variant="secondary" size="sm" className="w-full">
-          <Smile className="w-4 h-4" />
-          Mark remaining {stats.pending} as Happy 😊
-        </Button>
+      {!isDesktop && !showGate && stats.pending > 0 && (
+        <BulkButton onClick={bulkMarkRemaining} count={stats.pending} fullWidth />
       )}
 
       {roster.length === 0 && !rosterLoading && (
-        <div className="text-center py-8">
-          <p className="text-sm font-bold text-edu-navy">No students enrolled</p>
-          <p className="text-xs text-muted-foreground mt-1">
+        <div
+          style={{
+            textAlign: "center",
+            padding: "32px 16px",
+            borderRadius: 22,
+            background: "#fff",
+            boxShadow: PILLOW,
+          }}
+        >
+          <p style={{ fontSize: 28, marginBottom: 6 }}>🌱</p>
+          <p style={{ fontSize: 14, fontWeight: 800, color: NAVY }}>
+            No students enrolled
+          </p>
+          <p style={{ fontSize: 12, color: "#64748B", marginTop: 4 }}>
             Ask your principal to add students to {primaryClass.name}.
           </p>
         </div>
       )}
 
-      <div className="grid grid-cols-3 gap-3">
+      {/* Roster grid */}
+      <div style={{ display: "grid", gridTemplateColumns: gridCols, gap: 12 }}>
         {roster.map((c) => {
           const rec = records[c.id];
           return (
@@ -260,46 +404,162 @@ export default function Attendance() {
       {/* Mood bottom-sheet */}
       {sheetChild && (
         <div
-          className="fixed inset-0 z-50 bg-black/40 flex items-end animate-fade-in"
           onClick={() => setMoodSheetFor(null)}
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 50,
+            background: "rgba(15,23,42,0.42)",
+            backdropFilter: "blur(4px)",
+            WebkitBackdropFilter: "blur(4px)",
+            display: "flex",
+            alignItems: isDesktop ? "center" : "flex-end",
+            justifyContent: "center",
+            animation: "fade-in 200ms ease-out",
+          }}
         >
           <div
-            className="w-full max-w-md mx-auto bg-white rounded-t-3xl p-5 animate-slide-up"
             onClick={(e) => e.stopPropagation()}
+            style={{
+              width: "100%",
+              maxWidth: 460,
+              background: "#fff",
+              borderRadius: isDesktop ? 28 : "28px 28px 0 0",
+              padding: 22,
+              boxShadow: "0 -20px 60px rgba(15,23,42,0.18)",
+              animation: "slide-up 240ms cubic-bezier(.34,1.56,.64,1)",
+              position: "relative",
+              overflow: "hidden",
+              margin: isDesktop ? "0 16px" : 0,
+            }}
           >
-            <div className="w-12 h-1.5 bg-border rounded-full mx-auto mb-4" />
-            <div className="text-center mb-5">
-              <p className="text-xs uppercase tracking-widest text-muted-foreground font-bold">
-                How did {sheetChild.name.split(" ")[0]} arrive?
+            <DotScribbles color={BLUSH} dense />
+
+            {!isDesktop && (
+              <div
+                style={{
+                  width: 48,
+                  height: 5,
+                  borderRadius: 999,
+                  background: "#E2E8F0",
+                  margin: "0 auto 14px",
+                }}
+              />
+            )}
+
+            <div style={{ textAlign: "center", marginBottom: 18, position: "relative", zIndex: 1 }}>
+              <div style={{ display: "flex", justifyContent: "center", marginBottom: 12 }}>
+                <CartoonAvatar
+                  name={sheetChild.name}
+                  size={68}
+                  ringColor={MINT}
+                  ringWidth={4}
+                />
+              </div>
+              <p
+                style={{
+                  fontSize: 11,
+                  fontWeight: 800,
+                  letterSpacing: "0.16em",
+                  textTransform: "uppercase",
+                  color: BLUSH,
+                }}
+              >
+                Arrival mood
               </p>
-              <p className="text-xs text-muted-foreground/70 mt-1">
+              <p
+                style={{
+                  fontSize: 18,
+                  fontWeight: 800,
+                  letterSpacing: "-0.3px",
+                  color: NAVY,
+                  marginTop: 4,
+                }}
+              >
+                How did {sheetChild.name.split(" ")[0]} arrive?{" "}
+                <span
+                  aria-hidden
+                  style={{ display: "inline-block", transform: "rotate(-8deg)" }}
+                >
+                  💗
+                </span>
+              </p>
+              <p
+                style={{
+                  fontSize: 12,
+                  fontWeight: 500,
+                  color: "#94A3B8",
+                  marginTop: 4,
+                }}
+              >
                 This helps the parent feel at ease.
               </p>
             </div>
-            <div className="grid grid-cols-5 gap-2">
-              {MOODS.map((m) => (
-                <button
-                  key={m.key}
-                  onClick={() => pickMood(m.key as MoodKey)}
-                  className={cn(
-                    "aspect-square rounded-2xl flex flex-col items-center justify-center gap-1 active:scale-95 transition-all",
-                    sheetMood === m.key
-                      ? `${m.color} text-white shadow-md ring-2 ring-offset-2 ring-edu-navy`
-                      : "bg-secondary hover:bg-secondary/80"
-                  )}
-                >
-                  <span className="text-2xl">{m.emoji}</span>
-                  <span className="text-[10px] font-bold">{m.label}</span>
-                </button>
-              ))}
+
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(5, minmax(0, 1fr))",
+                gap: 8,
+                position: "relative",
+                zIndex: 1,
+              }}
+            >
+              {MOODS.map((m) => {
+                const selected = sheetMood === m.key;
+                return (
+                  <button
+                    key={m.key}
+                    onClick={() => pickMood(m.key as MoodKey)}
+                    type="button"
+                    style={{
+                      aspectRatio: "1 / 1",
+                      borderRadius: 18,
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: 4,
+                      background: selected
+                        ? `linear-gradient(135deg, ${m.tone}, ${m.tone}cc)`
+                        : "#F1F5F9",
+                      color: selected ? "#fff" : "#334155",
+                      boxShadow: selected
+                        ? `0 6px 16px ${m.tone}55`
+                        : "inset 0 0 0 1px #E2E8F0",
+                      transition: "transform 140ms ease",
+                      cursor: "pointer",
+                    }}
+                    className="active:scale-90 hover:-translate-y-0.5"
+                  >
+                    <span style={{ fontSize: 26, lineHeight: 1 }}>{m.emoji}</span>
+                    <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.04em" }}>
+                      {m.label}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
-            <Button
-              variant="ghost"
-              className="w-full mt-4"
+
+            <button
+              type="button"
               onClick={() => setMoodSheetFor(null)}
+              style={{
+                width: "100%",
+                marginTop: 14,
+                padding: "10px 14px",
+                borderRadius: 14,
+                background: "transparent",
+                fontSize: 13,
+                fontWeight: 700,
+                color: "#475569",
+                position: "relative",
+                zIndex: 1,
+                cursor: "pointer",
+              }}
             >
               Done
-            </Button>
+            </button>
           </div>
         </div>
       )}
@@ -307,24 +567,119 @@ export default function Attendance() {
   );
 }
 
-function Counter({
+/* ═══════════════════════ building blocks ═══════════════════════ */
+
+function CounterCard({
   label,
   value,
-  color,
+  emoji,
+  tone,
+  surface,
 }: {
   label: string;
   value: number;
-  color: string;
+  emoji: string;
+  tone: string;
+  surface: string;
 }) {
   return (
-    <Card>
-      <CardContent className="p-3 text-center">
-        <p className={cn("text-2xl font-black leading-none", color)}>{value}</p>
-        <p className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground mt-1">
-          {label}
-        </p>
-      </CardContent>
-    </Card>
+    <div
+      style={{
+        position: "relative",
+        overflow: "hidden",
+        borderRadius: 22,
+        padding: "14px 14px 12px",
+        background: surface,
+        boxShadow: PILLOW,
+      }}
+    >
+      <DotScribbles color={tone} />
+      <div
+        style={{
+          display: "flex",
+          alignItems: "baseline",
+          justifyContent: "space-between",
+          position: "relative",
+          zIndex: 1,
+        }}
+      >
+        <span
+          style={{
+            fontSize: 32,
+            fontWeight: 900,
+            letterSpacing: "-1.2px",
+            color: tone,
+            lineHeight: 1,
+          }}
+        >
+          {value}
+        </span>
+        <span
+          style={{
+            fontSize: 22,
+            lineHeight: 1,
+            transform: "rotate(8deg)",
+            filter: "drop-shadow(0 3px 6px rgba(0,0,0,0.08))",
+          }}
+          aria-hidden
+        >
+          {emoji}
+        </span>
+      </div>
+      <p
+        style={{
+          fontSize: 10,
+          fontWeight: 800,
+          letterSpacing: "0.14em",
+          textTransform: "uppercase",
+          color: tone,
+          opacity: 0.75,
+          marginTop: 6,
+          position: "relative",
+          zIndex: 1,
+        }}
+      >
+        {label}
+      </p>
+    </div>
+  );
+}
+
+function BulkButton({
+  onClick,
+  count,
+  fullWidth = false,
+}: {
+  onClick: () => void;
+  count: number;
+  fullWidth?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      style={{
+        width: fullWidth ? "100%" : undefined,
+        padding: "12px 18px",
+        borderRadius: 18,
+        background: `linear-gradient(135deg, ${MINT}, #059669)`,
+        color: "#fff",
+        fontSize: 13,
+        fontWeight: 800,
+        letterSpacing: "-0.1px",
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 8,
+        boxShadow: `0 10px 24px -8px ${MINT}88`,
+        cursor: "pointer",
+        whiteSpace: "nowrap",
+      }}
+      className="active:scale-95 hover:-translate-y-0.5 transition"
+    >
+      <Sparkles size={16} strokeWidth={2.6} />
+      Mark remaining {count} as Happy 😊
+    </button>
   );
 }
 
@@ -345,57 +700,204 @@ function ChildCard({
 }) {
   const handlers = useLongPress(onLongPress, onTap, 500);
   const moodEmoji = MOODS.find((m) => m.key === mood)?.emoji;
-  const isPresent = status === "present" || status === "late" || status === "half-day";
+  const isPresent =
+    status === "present" || status === "late" || status === "half-day";
+  const isAbsent = status === "absent";
+
+  const surface = isPresent
+    ? "linear-gradient(135deg, #C9F5DE 0%, #F0FBF5 100%)"
+    : isAbsent
+    ? "linear-gradient(135deg, #FFD6D6 0%, #FFF1F1 100%)"
+    : "linear-gradient(135deg, #F8FAFC 0%, #FFFFFF 100%)";
+
+  const ring = isPresent ? MINT : isAbsent ? RED : "#CBD5E1";
+  const scribble = isPresent ? MINT : isAbsent ? RED : NAVY;
 
   return (
     <button
       type="button"
       {...handlers}
       disabled={busy}
-      className={cn(
-        "relative aspect-[3/4] rounded-2xl border-2 flex flex-col items-center justify-end overflow-hidden p-2 active:scale-95 transition-all",
-        isPresent && "border-edu-green bg-edu-light-green/30",
-        status === "absent" && "border-edu-red bg-edu-light-red/30 opacity-60",
-        status === "none" && "border-border bg-white",
-        busy && "opacity-50"
-      )}
+      style={{
+        position: "relative",
+        overflow: "hidden",
+        aspectRatio: "3 / 4",
+        borderRadius: 22,
+        background: surface,
+        boxShadow: PILLOW,
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "flex-end",
+        padding: "12px 8px 10px",
+        border: "none",
+        cursor: busy ? "default" : "pointer",
+        opacity: busy ? 0.6 : 1,
+        transition: "transform 140ms ease",
+      }}
+      className="active:scale-95"
     >
-      <div className="absolute inset-0 flex items-center justify-center">
-        <div
-          className={cn(
-            "w-14 h-14 rounded-full flex items-center justify-center text-xl font-black text-white",
-            isPresent && "bg-edu-green",
-            status === "absent" && "bg-edu-red",
-            status === "none" && "bg-edu-navy/60"
-          )}
-        >
-          {child.name
-            .split(" ")
-            .map((s) => s[0])
-            .slice(0, 2)
-            .join("")
-            .toUpperCase()}
-        </div>
+      <DotScribbles color={scribble} />
+
+      {/* Avatar — centered, with status ring */}
+      <div
+        style={{
+          position: "absolute",
+          left: 0,
+          right: 0,
+          top: "44%",
+          transform: "translateY(-50%)",
+          display: "flex",
+          justifyContent: "center",
+          pointerEvents: "none",
+        }}
+      >
+        <CartoonAvatar
+          name={child.name}
+          size={64}
+          ringColor={ring}
+          ringWidth={3}
+        />
       </div>
 
+      {/* Present checkmark sticker top-right */}
       {isPresent && (
-        <div className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-edu-green flex items-center justify-center text-white shadow">
-          <Check className="w-3.5 h-3.5" />
-        </div>
-      )}
-      {moodEmoji && (
-        <div className="absolute top-1.5 left-1.5 text-lg">{moodEmoji}</div>
-      )}
-      {busy && (
-        <div className="absolute inset-0 bg-white/70 flex items-center justify-center">
-          <Loader2 className="w-5 h-5 animate-spin text-edu-navy" />
+        <div
+          style={{
+            position: "absolute",
+            top: 8,
+            right: 8,
+            width: 24,
+            height: 24,
+            borderRadius: 999,
+            background: MINT,
+            color: "#fff",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            boxShadow: `0 4px 10px ${MINT}55`,
+            transform: "rotate(8deg)",
+          }}
+          aria-hidden
+        >
+          <Check size={14} strokeWidth={3} />
         </div>
       )}
 
-      <p className="relative text-[11px] font-bold text-foreground leading-tight truncate w-full text-center bg-white/85 rounded px-1 py-0.5">
+      {/* Absent X sticker top-right */}
+      {isAbsent && (
+        <div
+          style={{
+            position: "absolute",
+            top: 8,
+            right: 8,
+            padding: "2px 8px",
+            borderRadius: 999,
+            background: RED,
+            color: "#fff",
+            fontSize: 10,
+            fontWeight: 800,
+            letterSpacing: "0.08em",
+            transform: "rotate(8deg)",
+            boxShadow: `0 4px 10px ${RED}55`,
+          }}
+          aria-hidden
+        >
+          OFF
+        </div>
+      )}
+
+      {/* Mood emoji top-left */}
+      {moodEmoji && (
+        <div
+          style={{
+            position: "absolute",
+            top: 6,
+            left: 6,
+            fontSize: 22,
+            transform: "rotate(-8deg)",
+            filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.10))",
+            pointerEvents: "none",
+          }}
+          aria-hidden
+        >
+          {moodEmoji}
+        </div>
+      )}
+
+      {/* Busy overlay */}
+      {busy && (
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            background: "rgba(255,255,255,0.7)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <Loader2 className="animate-spin" color={NAVY} />
+        </div>
+      )}
+
+      {/* Name pill bottom */}
+      <p
+        style={{
+          position: "relative",
+          zIndex: 1,
+          fontSize: 11,
+          fontWeight: 800,
+          color: "#0F172A",
+          background: "rgba(255,255,255,0.88)",
+          backdropFilter: "blur(4px)",
+          WebkitBackdropFilter: "blur(4px)",
+          padding: "3px 8px",
+          borderRadius: 999,
+          maxWidth: "100%",
+          whiteSpace: "nowrap",
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+        }}
+      >
         {child.name.split(" ")[0]}
       </p>
     </button>
+  );
+}
+
+function DotScribbles({
+  color,
+  dense = false,
+}: {
+  color: string;
+  dense?: boolean;
+}) {
+  return (
+    <svg
+      aria-hidden="true"
+      width="100%"
+      height="100%"
+      style={{
+        position: "absolute",
+        inset: 0,
+        opacity: dense ? 0.1 : 0.07,
+        pointerEvents: "none",
+      }}
+    >
+      <circle cx="14%" cy="24%" r="2.5" fill={color} />
+      <circle cx="82%" cy="14%" r="1.8" fill={color} />
+      <circle cx="68%" cy="62%" r="2" fill={color} />
+      <circle cx="22%" cy="80%" r="1.6" fill={color} />
+      <circle cx="48%" cy="32%" r="1.4" fill={color} />
+      {dense && (
+        <>
+          <circle cx="90%" cy="80%" r="2.2" fill={color} />
+          <circle cx="6%" cy="60%" r="1.4" fill={color} />
+          <circle cx="55%" cy="88%" r="1.6" fill={color} />
+        </>
+      )}
+    </svg>
   );
 }
 

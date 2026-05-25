@@ -116,9 +116,8 @@ export default function Home() {
       <div
         className="animate-fade-in"
         style={{
-          padding: "24px 32px 80px",
-          maxWidth: 1280,
-          margin: "0 auto",
+          padding: "24px 28px 80px",
+          width: "100%",
         }}
       >
         <Hero
