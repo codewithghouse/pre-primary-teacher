@@ -18,9 +18,12 @@ import {
   Settings as SettingsIcon,
   User as UserIcon,
   FileText,
+  MessageCircle,
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useTeacherClass } from "@/hooks/useTeacherClass";
+import { usePPMessageThreads } from "@/hooks/usePPMessages";
 
 interface NavItem {
   to: string;
@@ -70,6 +73,7 @@ const GROUPS: NavGroup[] = [
   {
     label: "Communication",
     items: [
+      { to: "/messages", label: "Messages", icon: MessageCircle },
       { to: "/notices", label: "Class Notices", icon: Megaphone },
       { to: "/events", label: "Class Events", icon: CalendarIcon },
       { to: "/photos", label: "Photo Studio", icon: ImageIcon },
@@ -94,6 +98,8 @@ interface AppSidebarProps {
 // K-12 teacher-dashboard navigation pattern.
 export function DesktopSidebar({ isOpen, onClose }: AppSidebarProps) {
   const { teacherData } = useAuth();
+  const { primaryClass } = useTeacherClass();
+  const { totalUnread } = usePPMessageThreads(primaryClass?.id);
   const initials = (teacherData?.name || teacherData?.displayName || "T")
     .split(" ")
     .map((s) => s[0])
@@ -156,35 +162,50 @@ export function DesktopSidebar({ isOpen, onClose }: AppSidebarProps) {
               {group.label}
             </p>
             <ul className="space-y-0.5">
-              {group.items.map(({ to, label, icon: Icon, end }) => (
-                <li key={to}>
-                  <NavLink
-                    to={to}
-                    end={end}
-                    onClick={onClose}
-                    className={({ isActive }) =>
-                      cn(
-                        "flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm font-semibold transition group",
-                        isActive
-                          ? "bg-edu-blue text-white shadow-md"
-                          : "text-white/70 hover:bg-white/5 hover:text-white"
-                      )
-                    }
-                  >
-                    {({ isActive }) => (
-                      <>
-                        <Icon
-                          className={cn(
-                            "w-4 h-4 shrink-0",
-                            isActive ? "" : "opacity-70"
+              {group.items.map(({ to, label, icon: Icon, end }) => {
+                const badge = to === "/messages" ? totalUnread : 0;
+                return (
+                  <li key={to}>
+                    <NavLink
+                      to={to}
+                      end={end}
+                      onClick={onClose}
+                      className={({ isActive }) =>
+                        cn(
+                          "flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm font-semibold transition group",
+                          isActive
+                            ? "bg-edu-blue text-white shadow-md"
+                            : "text-white/70 hover:bg-white/5 hover:text-white"
+                        )
+                      }
+                    >
+                      {({ isActive }) => (
+                        <>
+                          <Icon
+                            className={cn(
+                              "w-4 h-4 shrink-0",
+                              isActive ? "" : "opacity-70"
+                            )}
+                          />
+                          <span className="truncate flex-1">{label}</span>
+                          {badge > 0 && (
+                            <span
+                              className={cn(
+                                "min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-black flex items-center justify-center leading-none",
+                                isActive
+                                  ? "bg-white text-edu-blue"
+                                  : "bg-edu-pink text-white"
+                              )}
+                            >
+                              {badge > 99 ? "99+" : badge}
+                            </span>
                           )}
-                        />
-                        <span className="truncate">{label}</span>
-                      </>
-                    )}
-                  </NavLink>
-                </li>
-              ))}
+                        </>
+                      )}
+                    </NavLink>
+                  </li>
+                );
+              })}
             </ul>
           </div>
         ))}
