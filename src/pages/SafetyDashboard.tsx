@@ -4,43 +4,43 @@
  * medical notes, blood group, comfort cue, dietary restrictions, and
  * emergency contacts.
  *
- * Used for:
- *   - Daily situational awareness (sub-teacher days, fire drills)
- *   - Pre-trip preparation (allergens roll-up)
- *   - Quick reference during incidents
- *   - Printing a hard copy for picnics
- *
- * Desktop layout is print-friendly — grid of cards with high-contrast
- * red flags at the top so a substitute teacher can scan it fast.
+ * Cartoonified 2026-05-25. Print-friendly desktop layout preserved via
+ * the .print:hidden Tailwind utility on interactive chrome.
  */
 import { useMemo, useState } from "react";
 import {
-  ShieldAlert,
-  Heart,
   Phone,
-  Droplet,
-  Utensils,
   Search,
   AlertTriangle,
-  Sparkles,
   Mail,
   Printer,
-  Users as UsersIcon,
 } from "lucide-react";
 import { format } from "date-fns";
 import { useTeacherClass } from "@/hooks/useTeacherClass";
 import { useClassRoster, type RosterChild } from "@/hooks/useClassRoster";
 import { useIsDesktop } from "@/hooks/useIsDesktop";
-import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { cn } from "@/lib/utils";
+import { CartoonAvatar } from "@/components/CartoonAvatar";
+
+const NAVY = "#1e3272";
+const MINT = "#10B981";
+const PEACH = "#FB923C";
+const BLUSH = "#EC4899";
+const SKY = "#0EA5E9";
+const LAV = "#A78BFA";
+const BUTTER = "#F59E0B";
+const RED = "#EF4444";
+
+const PILLOW =
+  "0 1px 0 rgba(255,255,255,0.55) inset, 0 14px 32px -10px rgba(30,50,114,0.16), 0 4px 10px rgba(30,50,114,0.06)";
+
+type FilterKey = "all" | "alerts" | "allergens";
 
 export default function SafetyDashboard() {
   const { primaryClass, loading: classLoading } = useTeacherClass();
   const { roster, loading: rosterLoading } = useClassRoster(primaryClass?.id);
   const isDesktop = useIsDesktop();
   const [search, setSearch] = useState("");
-  const [filter, setFilter] = useState<"all" | "alerts" | "allergens">("all");
+  const [filter, setFilter] = useState<FilterKey>("all");
 
   const summary = useMemo(() => {
     const allergenSet = new Set<string>();
@@ -94,7 +94,14 @@ export default function SafetyDashboard() {
 
   if (classLoading || rosterLoading) {
     return (
-      <div className="px-4 py-12 text-center text-xs text-muted-foreground">
+      <div
+        style={{
+          padding: "48px 16px",
+          textAlign: "center",
+          fontSize: 12,
+          color: "#64748B",
+        }}
+      >
         Loading roster…
       </div>
     );
@@ -102,146 +109,363 @@ export default function SafetyDashboard() {
 
   if (!primaryClass) {
     return (
-      <div className="px-4 py-12 text-center">
-        <p className="text-sm font-bold text-edu-navy">No class assigned</p>
+      <div style={{ padding: "48px 16px", textAlign: "center" }}>
+        <p style={{ fontSize: 16, fontWeight: 800, color: NAVY }}>
+          🌱 No class assigned
+        </p>
       </div>
     );
   }
 
+  const cardGridCols = isDesktop ? "repeat(2, minmax(0, 1fr))" : "1fr";
+
   return (
     <div
-      className={cn(
-        "py-4 space-y-4 animate-fade-in print:bg-white print:py-2",
-        isDesktop ? "px-6 lg:px-10 max-w-7xl mx-auto" : "px-4"
-      )}
+      className="animate-fade-in print:bg-white"
+      style={{
+        padding: isDesktop ? "24px 28px 80px" : "16px 16px 80px",
+        display: "flex",
+        flexDirection: "column",
+        gap: 16,
+        width: "100%",
+      }}
     >
-      {/* Header */}
-      <div className="flex items-start justify-between gap-3 flex-wrap">
-        <div className="flex items-center gap-2">
-          <div
-            className={cn(
-              "rounded-xl bg-edu-light-red text-edu-red flex items-center justify-center",
-              isDesktop ? "w-10 h-10" : "w-9 h-9"
-            )}
+      {/* Hero */}
+      <div
+        style={{
+          position: "relative",
+          overflow: "hidden",
+          borderRadius: 28,
+          padding: isDesktop ? "22px 26px" : "18px 18px",
+          background:
+            "linear-gradient(135deg, #FFD6D6 0%, #FFEDED 55%, #FFFFFF 100%)",
+          boxShadow: PILLOW,
+        }}
+      >
+        <DotScribbles color={RED} dense />
+        <div
+          style={{
+            position: "relative",
+            zIndex: 1,
+            display: "flex",
+            alignItems: "center",
+            gap: 14,
+            flexWrap: "wrap",
+          }}
+        >
+          <span
+            style={{
+              width: 52,
+              height: 52,
+              borderRadius: 18,
+              background: `linear-gradient(135deg, ${RED}, #DC2626)`,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: 26,
+              boxShadow: `0 8px 18px ${RED}55`,
+              transform: "rotate(-8deg)",
+              flexShrink: 0,
+            }}
+            aria-hidden
           >
-            <ShieldAlert className={isDesktop ? "w-5 h-5" : "w-4 h-4"} />
-          </div>
-          <div>
-            <h1
-              className={cn(
-                "font-black text-edu-navy leading-none",
-                isDesktop ? "text-2xl" : "text-xl"
-              )}
+            🛟
+          </span>
+          <div style={{ flex: 1, minWidth: 200 }}>
+            <p
+              style={{
+                fontSize: 11,
+                fontWeight: 800,
+                letterSpacing: "0.16em",
+                textTransform: "uppercase",
+                color: RED,
+                opacity: 0.9,
+              }}
             >
-              Safety Dashboard
+              Safety snapshot
+            </p>
+            <h1
+              style={{
+                fontSize: isDesktop ? 26 : 21,
+                fontWeight: 800,
+                letterSpacing: "-0.6px",
+                color: NAVY,
+                marginTop: 2,
+              }}
+            >
+              Safety Dashboard{" "}
+              <span
+                aria-hidden
+                style={{ display: "inline-block", transform: "rotate(6deg)" }}
+              >
+                ✨
+              </span>
             </h1>
-            <p className="text-[11px] text-muted-foreground mt-1 font-semibold flex items-center gap-1">
-              <UsersIcon className="w-3 h-3" />
-              {primaryClass.name} · {format(new Date(), "EEEE, d MMM")}
+            <p
+              style={{
+                fontSize: isDesktop ? 13 : 12,
+                fontWeight: 500,
+                color: "#64748B",
+                marginTop: 4,
+              }}
+            >
+              {primaryClass.name} · {format(new Date(), "EEEE, d MMM")} ·{" "}
+              {roster.length} {roster.length === 1 ? "child" : "children"} on
+              file
             </p>
           </div>
+          <button
+            type="button"
+            onClick={() => window.print()}
+            className="print:hidden"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 6,
+              padding: "10px 16px",
+              borderRadius: 14,
+              background: "#fff",
+              color: NAVY,
+              fontSize: 12,
+              fontWeight: 800,
+              border: "none",
+              cursor: "pointer",
+              boxShadow: PILLOW,
+            }}
+          >
+            <Printer size={14} strokeWidth={2.4} />
+            Print
+          </button>
         </div>
-        <button
-          type="button"
-          onClick={() => window.print()}
-          className="h-10 px-4 rounded-xl bg-secondary text-edu-navy font-bold text-sm flex items-center gap-1.5 hover:bg-secondary/70 print:hidden"
-        >
-          <Printer className="w-4 h-4" />
-          Print
-        </button>
       </div>
 
-      {/* Stats banner */}
-      <div className="rounded-2xl bg-gradient-to-br from-edu-red to-edu-navy text-white p-4 shadow-md print:hidden">
-        <div className="flex items-center gap-2 text-[10px] uppercase tracking-widest text-white/70 font-bold">
-          <Sparkles className="w-3 h-3" /> Safety Snapshot
-        </div>
-        <div className="grid grid-cols-4 gap-3 mt-2">
-          <Stat label="Allergies" value={summary.withAllergies} total={roster.length} />
-          <Stat label="Medical" value={summary.withMedical} total={roster.length} />
-          <Stat label="Dietary" value={summary.withDiet} total={roster.length} />
-          <Stat label="Pickup OK" value={summary.withPickupOnFile} total={roster.length} />
-        </div>
+      {/* 4-stat strip */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+          gap: 10,
+        }}
+      >
+        <CounterCard
+          label="Allergies"
+          value={summary.withAllergies}
+          total={roster.length}
+          emoji="🥜"
+          tone={RED}
+          surface="linear-gradient(135deg, #FFD6D6 0%, #FFF1F1 100%)"
+        />
+        <CounterCard
+          label="Medical"
+          value={summary.withMedical}
+          total={roster.length}
+          emoji="💊"
+          tone={PEACH}
+          surface="linear-gradient(135deg, #FFE0CC 0%, #FFF5EC 100%)"
+        />
+        <CounterCard
+          label="Dietary"
+          value={summary.withDiet}
+          total={roster.length}
+          emoji="🥗"
+          tone={BUTTER}
+          surface="linear-gradient(135deg, #FFEBC8 0%, #FFF7E5 100%)"
+        />
+        <CounterCard
+          label="Pickup OK"
+          value={summary.withPickupOnFile}
+          total={roster.length}
+          emoji="🚸"
+          tone={MINT}
+          surface="linear-gradient(135deg, #D6F5E2 0%, #F1FBF5 100%)"
+        />
       </div>
 
       {/* Allergen roll-up — critical for picnic / shared snack days */}
       {summary.allergenList.length > 0 && (
-        <Card className="border-edu-red/40 bg-edu-light-red/15">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <AlertTriangle className="w-4 h-4 text-edu-red" />
-              <p className="text-[10px] uppercase tracking-widest font-black text-edu-red">
-                Class-wide allergens · {summary.allergenList.length} flagged
-              </p>
+        <div
+          style={{
+            position: "relative",
+            overflow: "hidden",
+            borderRadius: 22,
+            padding: 16,
+            background: "linear-gradient(135deg, #FFE3E3 0%, #FFF4F4 100%)",
+            boxShadow: PILLOW,
+          }}
+        >
+          <DotScribbles color={RED} dense />
+          <div style={{ position: "relative", zIndex: 1 }}>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+                marginBottom: 10,
+              }}
+            >
+              <span
+                style={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: 12,
+                  background: `linear-gradient(135deg, ${RED}, #DC2626)`,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  color: "#fff",
+                  boxShadow: `0 6px 14px ${RED}55`,
+                  transform: "rotate(-6deg)",
+                  flexShrink: 0,
+                }}
+              >
+                <AlertTriangle size={18} strokeWidth={2.4} />
+              </span>
+              <div>
+                <p
+                  style={{
+                    fontSize: 10,
+                    fontWeight: 800,
+                    letterSpacing: "0.14em",
+                    textTransform: "uppercase",
+                    color: RED,
+                  }}
+                >
+                  Class-wide allergens
+                </p>
+                <p
+                  style={{
+                    fontSize: 16,
+                    fontWeight: 800,
+                    color: NAVY,
+                    marginTop: 2,
+                    letterSpacing: "-0.3px",
+                  }}
+                >
+                  {summary.allergenList.length} flagged
+                </p>
+              </div>
             </div>
-            <div className="flex flex-wrap gap-1.5">
-              {summary.allergenList.map((a) => (
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+              {summary.allergenList.map((a, idx) => (
                 <span
                   key={a}
-                  className="text-xs font-bold bg-edu-red/15 text-edu-red px-2 py-1 rounded-full capitalize"
+                  style={{
+                    fontSize: 12,
+                    fontWeight: 800,
+                    color: RED,
+                    background: "#fff",
+                    padding: "5px 12px",
+                    borderRadius: 999,
+                    textTransform: "capitalize",
+                    boxShadow: `inset 0 0 0 1px ${RED}33, 0 2px 6px rgba(239,68,68,0.10)`,
+                    transform: `rotate(${idx % 2 === 0 ? "-1.5deg" : "1.5deg"})`,
+                  }}
                 >
                   ⚠️ {a}
                 </span>
               ))}
             </div>
-            <p className="text-[10px] text-muted-foreground mt-3 leading-relaxed">
+            <p
+              style={{
+                fontSize: 11,
+                color: "#64748B",
+                marginTop: 12,
+                lineHeight: 1.55,
+              }}
+            >
               Check this list before any shared snack, picnic lunch, or sweet
               treats. Specific child-allergen mapping below.
             </p>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       )}
 
       {/* Filters + search */}
-      <div className="flex items-center gap-2 print:hidden">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input
+      <div
+        className="print:hidden"
+        style={{
+          display: "flex",
+          flexDirection: isDesktop ? "row" : "column",
+          gap: 10,
+        }}
+      >
+        <div
+          style={{
+            position: "relative",
+            borderRadius: 22,
+            background: "#fff",
+            boxShadow: PILLOW,
+            padding: "4px 4px 4px 14px",
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            flex: isDesktop ? 1 : "0 1 auto",
+          }}
+        >
+          <Search size={16} color="#94A3B8" strokeWidth={2.4} />
+          <input
             placeholder="Search a child…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="pl-9"
+            style={{
+              flex: 1,
+              background: "transparent",
+              border: "none",
+              outline: "none",
+              fontSize: 14,
+              fontWeight: 600,
+              color: "#0F172A",
+              padding: "12px 8px",
+              minWidth: 0,
+            }}
           />
         </div>
-      </div>
-      <div className="flex gap-2 overflow-x-auto pb-1 print:hidden">
-        <FilterPill
-          active={filter === "all"}
-          onClick={() => setFilter("all")}
-          label="All"
-          count={roster.length}
-        />
-        <FilterPill
-          active={filter === "alerts"}
-          onClick={() => setFilter("alerts")}
-          label="With alerts"
-          count={summary.withAllergies + summary.withMedical}
-          tone="red"
-        />
-        <FilterPill
-          active={filter === "allergens"}
-          onClick={() => setFilter("allergens")}
-          label="Allergies"
-          count={summary.withAllergies}
-          tone="orange"
-        />
+        <div
+          style={{
+            display: "flex",
+            gap: 8,
+            overflowX: "auto",
+            paddingBottom: 2,
+          }}
+        >
+          <FilterPill
+            active={filter === "all"}
+            onClick={() => setFilter("all")}
+            label="All"
+            count={roster.length}
+            tone={NAVY}
+          />
+          <FilterPill
+            active={filter === "alerts"}
+            onClick={() => setFilter("alerts")}
+            label="With alerts"
+            count={summary.withAllergies + summary.withMedical}
+            tone={RED}
+          />
+          <FilterPill
+            active={filter === "allergens"}
+            onClick={() => setFilter("allergens")}
+            label="Allergies"
+            count={summary.withAllergies}
+            tone={PEACH}
+          />
+        </div>
       </div>
 
       {/* Children cards */}
       {sorted.length === 0 ? (
-        <Card>
-          <CardContent className="p-8 text-center text-sm text-muted-foreground">
-            No children match.
-          </CardContent>
-        </Card>
+        <EmptyState
+          emoji="🔍"
+          title="No children match"
+          subtitle="Try a different search or filter."
+        />
       ) : (
         <div
-          className={cn(
-            "gap-3 print:gap-2",
-            isDesktop
-              ? "grid grid-cols-2 xl:grid-cols-3 gap-3 print:grid-cols-2"
-              : "space-y-3"
-          )}
+          style={{
+            display: "grid",
+            gridTemplateColumns: cardGridCols,
+            gap: 12,
+          }}
         >
           {sorted.map((child) => (
             <ChildSafetyCard key={child.id} child={child} />
@@ -249,29 +473,109 @@ export default function SafetyDashboard() {
         </div>
       )}
 
-      <p className="text-[10px] text-center text-muted-foreground pt-2 print:pt-4">
+      <p
+        style={{
+          fontSize: 10,
+          textAlign: "center",
+          color: "#94A3B8",
+          fontWeight: 600,
+          paddingTop: 8,
+        }}
+        className="print:pt-4"
+      >
         Edullent · Pre-Primary · printed {format(new Date(), "d MMM yyyy")}
       </p>
     </div>
   );
 }
 
-function Stat({
+/* ═══════════════════════ building blocks ═══════════════════════ */
+
+function CounterCard({
   label,
   value,
   total,
+  emoji,
+  tone,
+  surface,
 }: {
   label: string;
   value: number;
   total: number;
+  emoji: string;
+  tone: string;
+  surface: string;
 }) {
   return (
-    <div>
-      <p className="text-2xl font-black leading-none">
-        {value}
-        <span className="text-base text-white/60">/{total}</span>
-      </p>
-      <p className="text-[10px] uppercase tracking-widest font-bold text-white/70 mt-1">
+    <div
+      style={{
+        position: "relative",
+        overflow: "hidden",
+        borderRadius: 22,
+        padding: "12px 12px 10px",
+        background: surface,
+        boxShadow: PILLOW,
+      }}
+    >
+      <DotScribbles color={tone} />
+      <div
+        style={{
+          display: "flex",
+          alignItems: "baseline",
+          justifyContent: "space-between",
+          position: "relative",
+          zIndex: 1,
+          gap: 4,
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "baseline", gap: 2 }}>
+          <span
+            style={{
+              fontSize: 28,
+              fontWeight: 900,
+              letterSpacing: "-1px",
+              color: tone,
+              lineHeight: 1,
+            }}
+          >
+            {value}
+          </span>
+          <span
+            style={{
+              fontSize: 12,
+              fontWeight: 700,
+              color: tone,
+              opacity: 0.55,
+            }}
+          >
+            /{total}
+          </span>
+        </div>
+        <span
+          style={{
+            fontSize: 20,
+            lineHeight: 1,
+            transform: "rotate(8deg)",
+            filter: "drop-shadow(0 3px 6px rgba(0,0,0,0.08))",
+          }}
+          aria-hidden
+        >
+          {emoji}
+        </span>
+      </div>
+      <p
+        style={{
+          fontSize: 10,
+          fontWeight: 800,
+          letterSpacing: "0.12em",
+          textTransform: "uppercase",
+          color: tone,
+          opacity: 0.75,
+          marginTop: 6,
+          position: "relative",
+          zIndex: 1,
+        }}
+      >
         {label}
       </p>
     </div>
@@ -289,32 +593,41 @@ function FilterPill({
   onClick: () => void;
   label: string;
   count: number;
-  tone?: "red" | "orange";
+  tone: string;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className={cn(
-        "shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition",
-        active
-          ? "bg-edu-navy text-white shadow-sm"
-          : "bg-white text-muted-foreground border border-border hover:border-edu-navy/40"
-      )}
+      style={{
+        flexShrink: 0,
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 8,
+        padding: "10px 16px",
+        borderRadius: 999,
+        fontSize: 12,
+        fontWeight: 800,
+        background: active ? `linear-gradient(135deg, ${tone}, ${tone}cc)` : "#fff",
+        color: active ? "#fff" : NAVY,
+        border: "none",
+        cursor: "pointer",
+        boxShadow: active ? `0 8px 18px -6px ${tone}66` : PILLOW,
+        transition: "all 160ms ease",
+      }}
+      className="active:scale-95 hover:-translate-y-0.5"
     >
-      <span>{label}</span>
+      {label}
       {count > 0 && (
         <span
-          className={cn(
-            "px-1.5 py-0.5 rounded-full text-[10px] font-black leading-none",
-            active
-              ? "bg-white/20 text-white"
-              : tone === "red"
-              ? "bg-edu-light-red text-edu-red"
-              : tone === "orange"
-              ? "bg-edu-light-orange text-edu-orange"
-              : "bg-edu-light-blue text-edu-blue"
-          )}
+          style={{
+            fontSize: 10,
+            fontWeight: 900,
+            padding: "2px 8px",
+            borderRadius: 999,
+            background: active ? "rgba(255,255,255,0.22)" : `${tone}1f`,
+            color: active ? "#fff" : tone,
+          }}
         >
           {count}
         </span>
@@ -323,194 +636,398 @@ function FilterPill({
   );
 }
 
+function EmptyState({
+  emoji,
+  title,
+  subtitle,
+}: {
+  emoji: string;
+  title: string;
+  subtitle: string;
+}) {
+  return (
+    <div
+      style={{
+        textAlign: "center",
+        padding: "32px 16px",
+        borderRadius: 22,
+        background: "#fff",
+        boxShadow: PILLOW,
+      }}
+    >
+      <p style={{ fontSize: 32, marginBottom: 8 }} aria-hidden>
+        {emoji}
+      </p>
+      <p style={{ fontSize: 14, fontWeight: 800, color: NAVY }}>{title}</p>
+      <p style={{ fontSize: 12, color: "#64748B", marginTop: 4 }}>{subtitle}</p>
+    </div>
+  );
+}
+
 function ChildSafetyCard({ child }: { child: RosterChild }) {
   const hasAllergies = (child.allergies?.length || 0) > 0;
   const hasMedical = !!child.medical;
   const flagged = hasAllergies || hasMedical;
-  const initials = child.name
-    .split(/\s+/)
-    .map((s) => s[0])
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
+
+  const surface = hasAllergies
+    ? "linear-gradient(135deg, #FFD6D6 0%, #FFF1F1 100%)"
+    : hasMedical
+    ? "linear-gradient(135deg, #FFE0CC 0%, #FFF5EC 100%)"
+    : "linear-gradient(135deg, #ECF3FF 0%, #FAFCFF 100%)";
+  const scribble = hasAllergies ? RED : hasMedical ? PEACH : SKY;
+  const ring = hasAllergies ? RED : hasMedical ? PEACH : SKY;
 
   return (
-    <Card
-      className={cn(
-        "border-2 transition",
-        hasAllergies
-          ? "border-edu-red/50 bg-edu-light-red/15"
-          : hasMedical
-          ? "border-edu-orange/50 bg-edu-light-orange/15"
-          : "border-border"
-      )}
+    <div
+      style={{
+        position: "relative",
+        overflow: "hidden",
+        borderRadius: 22,
+        padding: 14,
+        background: surface,
+        boxShadow: PILLOW,
+        display: "flex",
+        flexDirection: "column",
+        gap: 10,
+      }}
     >
-      <CardContent className="p-4 space-y-3">
-        {/* Child header */}
-        <div className="flex items-center gap-3">
-          {child.photoURL ? (
-            <img
-              src={child.photoURL}
-              alt={child.name}
-              className="w-12 h-12 rounded-xl object-cover"
-            />
-          ) : (
-            <div
-              className={cn(
-                "w-12 h-12 rounded-xl flex items-center justify-center font-black text-sm",
-                flagged
-                  ? "bg-edu-red text-white"
-                  : "bg-edu-light-blue text-edu-blue"
-              )}
-            >
-              {initials}
-            </div>
-          )}
-          <div className="flex-1 min-w-0">
-            <p className="font-black text-edu-navy text-sm truncate">
-              {child.name}
-            </p>
-            <p className="text-[10px] text-muted-foreground">
-              Roll {child.rollNo}
-              {child.bloodGroup && (
-                <span className="ml-1 font-bold text-edu-red">
-                  · {child.bloodGroup}
-                </span>
-              )}
-            </p>
-          </div>
-          {flagged && (
-            <span className="text-[10px] font-black text-edu-red bg-edu-red/15 px-1.5 py-0.5 rounded uppercase tracking-wider">
-              {hasAllergies ? "Alert" : "Watch"}
-            </span>
-          )}
-        </div>
+      <DotScribbles color={scribble} />
 
-        {/* Allergies */}
-        {hasAllergies && (
-          <SafetyRow
-            icon={<ShieldAlert className="w-3.5 h-3.5 text-edu-red" />}
-            label="Allergies"
-            tone="red"
+      {/* Header */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 12,
+          position: "relative",
+          zIndex: 1,
+        }}
+      >
+        <CartoonAvatar
+          name={child.name}
+          size={48}
+          ringColor={ring}
+          ringWidth={3}
+        />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <p
+            style={{
+              fontSize: 14,
+              fontWeight: 800,
+              color: NAVY,
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              letterSpacing: "-0.2px",
+            }}
           >
-            {child.allergies!.map((a) => (
+            {child.name}
+          </p>
+          <p
+            style={{
+              fontSize: 11,
+              fontWeight: 600,
+              color: "#64748B",
+              marginTop: 2,
+            }}
+          >
+            Roll #{child.rollNo}
+            {child.bloodGroup && (
+              <span style={{ marginLeft: 6, fontWeight: 800, color: RED }}>
+                · 🩸 {child.bloodGroup}
+              </span>
+            )}
+          </p>
+        </div>
+        {flagged && (
+          <span
+            style={{
+              flexShrink: 0,
+              fontSize: 10,
+              fontWeight: 900,
+              letterSpacing: "0.08em",
+              padding: "4px 10px",
+              borderRadius: 999,
+              background: hasAllergies ? RED : PEACH,
+              color: "#fff",
+              textTransform: "uppercase",
+              transform: "rotate(6deg)",
+              boxShadow: `0 4px 10px ${hasAllergies ? RED : PEACH}55`,
+            }}
+          >
+            {hasAllergies ? "Alert" : "Watch"}
+          </span>
+        )}
+      </div>
+
+      {/* Sections */}
+      {hasAllergies && (
+        <SafetySection emoji="🥜" tone={RED} label="Allergies">
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+            {child.allergies!.map((a, idx) => (
               <span
                 key={a}
-                className="text-[11px] font-bold bg-edu-red/15 text-edu-red px-2 py-0.5 rounded-full capitalize"
+                style={{
+                  fontSize: 11,
+                  fontWeight: 800,
+                  color: RED,
+                  background: "#fff",
+                  padding: "4px 10px",
+                  borderRadius: 999,
+                  textTransform: "capitalize",
+                  boxShadow: `inset 0 0 0 1px ${RED}33`,
+                  transform: `rotate(${idx % 2 === 0 ? "-1.5deg" : "1.5deg"})`,
+                }}
               >
                 ⚠️ {a}
               </span>
             ))}
-          </SafetyRow>
-        )}
-
-        {/* Medical */}
-        {hasMedical && (
-          <SafetyRow
-            icon={<Heart className="w-3.5 h-3.5 text-edu-pink" />}
-            label="Medical"
-            tone="orange"
-          >
-            <p className="text-xs text-foreground/90 leading-relaxed">
-              {child.medical}
-            </p>
-          </SafetyRow>
-        )}
-
-        {/* Diet */}
-        {child.diet && (
-          <SafetyRow
-            icon={<Utensils className="w-3.5 h-3.5 text-edu-orange" />}
-            label="Diet"
-          >
-            <p className="text-xs text-foreground/90">{child.diet}</p>
-          </SafetyRow>
-        )}
-
-        {/* Comfort cue */}
-        {child.comfortCue && (
-          <SafetyRow
-            icon={<Heart className="w-3.5 h-3.5 text-edu-blue" />}
-            label="Comfort cue"
-          >
-            <p className="text-xs italic text-foreground/85">"{child.comfortCue}"</p>
-          </SafetyRow>
-        )}
-
-        {/* Emergency contacts */}
-        {(child.parentName || child.parentPhone) && (
-          <div className="pt-2 border-t border-border">
-            <div className="flex items-center gap-2 mb-1">
-              <Phone className="w-3 h-3 text-edu-navy" />
-              <p className="text-[9px] uppercase tracking-widest font-black text-muted-foreground">
-                Emergency contact
-              </p>
-            </div>
-            <div className="flex items-center gap-3 text-[11px]">
-              <span className="font-bold">{child.parentName || "Parent"}</span>
-              {child.parentPhone && (
-                <a
-                  href={`tel:${child.parentPhone}`}
-                  className="font-semibold text-edu-blue hover:underline flex items-center gap-1"
-                >
-                  <Phone className="w-3 h-3" />
-                  {child.parentPhone}
-                </a>
-              )}
-              {child.parentEmail && (
-                <a
-                  href={`mailto:${child.parentEmail}`}
-                  className="font-semibold text-muted-foreground hover:text-edu-blue flex items-center gap-1 truncate"
-                  title={child.parentEmail}
-                >
-                  <Mail className="w-3 h-3" />
-                  Email
-                </a>
-              )}
-            </div>
           </div>
-        )}
+        </SafetySection>
+      )}
 
-        {/* Empty state for low-risk children */}
-        {!flagged && !child.diet && !child.comfortCue && (
-          <p className="text-[10px] text-center text-muted-foreground italic py-1">
-            No safety notes on file
+      {hasMedical && (
+        <SafetySection emoji="💊" tone={PEACH} label="Medical">
+          <p
+            style={{
+              fontSize: 12,
+              color: "#0F172A",
+              lineHeight: 1.55,
+              fontWeight: 500,
+            }}
+          >
+            {child.medical}
           </p>
-        )}
-      </CardContent>
-    </Card>
+        </SafetySection>
+      )}
+
+      {child.diet && (
+        <SafetySection emoji="🥗" tone={BUTTER} label="Diet">
+          <p style={{ fontSize: 12, color: "#0F172A", fontWeight: 500 }}>
+            {child.diet}
+          </p>
+        </SafetySection>
+      )}
+
+      {child.comfortCue && (
+        <SafetySection emoji="💗" tone={BLUSH} label="Comfort cue">
+          <p
+            style={{
+              fontSize: 12,
+              fontStyle: "italic",
+              color: "#0F172A",
+              opacity: 0.85,
+              lineHeight: 1.55,
+            }}
+          >
+            "{child.comfortCue}"
+          </p>
+        </SafetySection>
+      )}
+
+      {/* Emergency contact footer */}
+      {(child.parentName || child.parentPhone || child.parentEmail) && (
+        <div
+          style={{
+            position: "relative",
+            zIndex: 1,
+            paddingTop: 10,
+            borderTop: "1px dashed rgba(15,23,42,0.12)",
+            marginTop: "auto",
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              marginBottom: 6,
+            }}
+          >
+            <span
+              aria-hidden
+              style={{ fontSize: 12, transform: "rotate(-6deg)", display: "inline-block" }}
+            >
+              📞
+            </span>
+            <p
+              style={{
+                fontSize: 9,
+                fontWeight: 800,
+                letterSpacing: "0.14em",
+                textTransform: "uppercase",
+                color: NAVY,
+                opacity: 0.7,
+              }}
+            >
+              Emergency contact
+            </p>
+          </div>
+          <p
+            style={{
+              fontSize: 12,
+              fontWeight: 800,
+              color: NAVY,
+              letterSpacing: "-0.1px",
+            }}
+          >
+            {child.parentName || "Parent"}
+          </p>
+          <div
+            style={{
+              display: "flex",
+              gap: 6,
+              marginTop: 8,
+              flexWrap: "wrap",
+            }}
+          >
+            {child.parentPhone && (
+              <a
+                href={`tel:${child.parentPhone.replace(/\s/g, "")}`}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6,
+                  fontSize: 11,
+                  fontWeight: 800,
+                  color: "#fff",
+                  background: `linear-gradient(135deg, ${SKY}, #0284C7)`,
+                  padding: "6px 12px",
+                  borderRadius: 999,
+                  textDecoration: "none",
+                  boxShadow: `0 4px 10px ${SKY}55`,
+                }}
+                className="active:scale-95 hover:-translate-y-0.5 transition print:bg-white print:text-blue-700 print:shadow-none"
+              >
+                <Phone size={11} strokeWidth={2.6} />
+                {child.parentPhone}
+              </a>
+            )}
+            {child.parentEmail && (
+              <a
+                href={`mailto:${child.parentEmail}`}
+                title={child.parentEmail}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6,
+                  fontSize: 11,
+                  fontWeight: 800,
+                  color: NAVY,
+                  background: "#fff",
+                  padding: "6px 12px",
+                  borderRadius: 999,
+                  textDecoration: "none",
+                  boxShadow: "inset 0 0 0 1px #CBD5E1",
+                }}
+                className="active:scale-95 hover:-translate-y-0.5 transition"
+              >
+                <Mail size={11} strokeWidth={2.6} />
+                Email
+              </a>
+            )}
+          </div>
+        </div>
+      )}
+
+      {!flagged && !child.diet && !child.comfortCue && (
+        <p
+          style={{
+            position: "relative",
+            zIndex: 1,
+            fontSize: 11,
+            textAlign: "center",
+            color: "#94A3B8",
+            fontStyle: "italic",
+            padding: "4px 0",
+          }}
+        >
+          No safety notes on file 🌱
+        </p>
+      )}
+    </div>
   );
 }
 
-function SafetyRow({
-  icon,
-  label,
+function SafetySection({
+  emoji,
   tone,
+  label,
   children,
 }: {
-  icon: React.ReactNode;
+  emoji: string;
+  tone: string;
   label: string;
-  tone?: "red" | "orange";
   children: React.ReactNode;
 }) {
   return (
-    <div>
-      <div className="flex items-center gap-1.5 mb-1">
-        {icon}
+    <div style={{ position: "relative", zIndex: 1 }}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 6,
+          marginBottom: 6,
+        }}
+      >
+        <span
+          aria-hidden
+          style={{ fontSize: 14, transform: "rotate(-6deg)", display: "inline-block" }}
+        >
+          {emoji}
+        </span>
         <p
-          className={cn(
-            "text-[9px] uppercase tracking-widest font-black",
-            tone === "red"
-              ? "text-edu-red"
-              : tone === "orange"
-              ? "text-edu-orange"
-              : "text-muted-foreground"
-          )}
+          style={{
+            fontSize: 9,
+            fontWeight: 800,
+            letterSpacing: "0.14em",
+            textTransform: "uppercase",
+            color: tone,
+          }}
         >
           {label}
         </p>
       </div>
-      <div className="flex flex-wrap gap-1.5">{children}</div>
+      {children}
     </div>
   );
 }
+
+function DotScribbles({
+  color,
+  dense = false,
+}: {
+  color: string;
+  dense?: boolean;
+}) {
+  return (
+    <svg
+      aria-hidden="true"
+      width="100%"
+      height="100%"
+      style={{
+        position: "absolute",
+        inset: 0,
+        opacity: dense ? 0.1 : 0.07,
+        pointerEvents: "none",
+      }}
+    >
+      <circle cx="14%" cy="24%" r="2.5" fill={color} />
+      <circle cx="82%" cy="14%" r="1.8" fill={color} />
+      <circle cx="68%" cy="62%" r="2" fill={color} />
+      <circle cx="22%" cy="80%" r="1.6" fill={color} />
+      <circle cx="48%" cy="32%" r="1.4" fill={color} />
+      {dense && (
+        <>
+          <circle cx="90%" cy="80%" r="2.2" fill={color} />
+          <circle cx="6%" cy="60%" r="1.4" fill={color} />
+          <circle cx="55%" cy="88%" r="1.6" fill={color} />
+        </>
+      )}
+    </svg>
+  );
+}
+
+// LAV is part of the shared sherbet palette but not currently used on this page.
+// Keep the constant referenced so future variants don't need a re-import.
+void LAV;

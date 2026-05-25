@@ -13,17 +13,14 @@ import {
 } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
-import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { cn } from "@/lib/utils";
 import { useTeacherClass } from "@/hooks/useTeacherClass";
 import { useClassRoster } from "@/hooks/useClassRoster";
 import { useIsDesktop } from "@/hooks/useIsDesktop";
+import { CartoonAvatar } from "@/components/CartoonAvatar";
 import {
   usePPIncidents,
   INCIDENT_TYPE_EMOJI,
   INCIDENT_TYPE_LABEL,
-  SEVERITY_COLOR,
   SEVERITY_LABEL,
   ALL_INCIDENT_TYPES,
   ALL_SEVERITIES,
@@ -31,6 +28,51 @@ import {
   type IncidentSeverity,
   type IncidentType,
 } from "@/hooks/usePPIncidents";
+
+/* ═══════════════════════════════════════════════════════════════════════
+   PRE-PRIMARY TEACHER · INCIDENTS LOG
+   Storybook-sherbet append-only safety + escalation log. Severity colors
+   drive every surface; cartoon avatars on each child reference.
+   ════════════════════════════════════════════════════════════════════════ */
+
+const NAVY = "#1e3272";
+const MINT = "#10B981";
+const PEACH = "#FB923C";
+const BLUSH = "#EC4899";
+const SKY = "#0EA5E9";
+const LAV = "#A78BFA";
+const BUTTER = "#F59E0B";
+const RED = "#EF4444";
+
+const PILLOW =
+  "0 1px 0 rgba(255,255,255,0.55) inset, 0 14px 32px -10px rgba(30,50,114,0.16), 0 4px 10px rgba(30,50,114,0.06)";
+
+const SEV_TONE: Record<IncidentSeverity, { tone: string; surface: string; bar: string; emoji: string }> = {
+  low: {
+    tone: MINT,
+    surface: "linear-gradient(135deg, #D6F5E2 0%, #F1FBF5 100%)",
+    bar: "#10B981",
+    emoji: "🟢",
+  },
+  medium: {
+    tone: BUTTER,
+    surface: "linear-gradient(135deg, #FFEBC8 0%, #FFF7E5 100%)",
+    bar: "#F59E0B",
+    emoji: "🟡",
+  },
+  high: {
+    tone: PEACH,
+    surface: "linear-gradient(135deg, #FFE0CC 0%, #FFF5EC 100%)",
+    bar: "#F97316",
+    emoji: "🟠",
+  },
+  critical: {
+    tone: RED,
+    surface: "linear-gradient(135deg, #FFD6D6 0%, #FFF1F1 100%)",
+    bar: "#DC2626",
+    emoji: "🔴",
+  },
+};
 
 export default function Incidents() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -58,15 +100,12 @@ export default function Incidents() {
   const [saving, setSaving] = useState(false);
   const [justSavedAt, setJustSavedAt] = useState<number | null>(null);
 
-  // Deep-link: /incidents?child=<id>&open=1 → opens composer pre-filled.
-  // Used by Child Profile 360 "Log incident" CTA.
   useEffect(() => {
     const childParam = searchParams.get("child");
     const openParam = searchParams.get("open");
     if (openParam === "1" && childParam) {
       setStudentId(childParam);
       setDialog(true);
-      // Strip the params so refresh doesn't re-open
       const next = new URLSearchParams(searchParams);
       next.delete("child");
       next.delete("open");
@@ -79,6 +118,16 @@ export default function Incidents() {
     const t = setTimeout(() => setJustSavedAt(null), 2500);
     return () => clearTimeout(t);
   }, [justSavedAt]);
+
+  // Body scroll lock when dialog is open
+  useEffect(() => {
+    if (!dialog) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [dialog]);
 
   const filtersActive = !!(
     filterChild ||
@@ -121,31 +170,18 @@ export default function Incidents() {
     };
   }, [incidents]);
 
-  if (classLoading) {
-    return (
-      <div className="px-4 py-12 flex flex-col items-center gap-3 text-muted-foreground">
-        <Loader2 className="w-6 h-6 animate-spin" />
-        <p className="text-xs">Resolving your class…</p>
-      </div>
-    );
-  }
-
+  if (classLoading) return <CenteredLoader label="Resolving your class…" />;
   if (!primaryClass) {
     return (
-      <div className="px-4 py-12 text-center">
-        <p className="text-sm font-bold text-edu-navy">No class assigned</p>
+      <div style={{ padding: "48px 16px", textAlign: "center" }}>
+        <p style={{ fontSize: 16, fontWeight: 800, color: NAVY }}>
+          🌱 No class assigned
+        </p>
       </div>
     );
   }
-
-  if (incLoading && incidents.length === 0) {
-    return (
-      <div className="px-4 py-12 flex flex-col items-center gap-3 text-muted-foreground">
-        <Loader2 className="w-6 h-6 animate-spin" />
-        <p className="text-xs">Loading incidents…</p>
-      </div>
-    );
-  }
+  if (incLoading && incidents.length === 0)
+    return <CenteredLoader label="Loading incidents…" />;
 
   const openAdd = (preChildId?: string) => {
     setStudentId(preChildId || "");
@@ -202,163 +238,386 @@ export default function Incidents() {
     }
   };
 
+  const cardGridCols = isDesktop ? "repeat(2, minmax(0, 1fr))" : "1fr";
+
   return (
-    <div
-      className={cn(
-        "py-4 space-y-4 animate-fade-in",
-        isDesktop ? "px-6 lg:px-10 max-w-7xl mx-auto" : "px-4"
-      )}
-    >
-      <div className="flex items-start justify-between gap-2 pt-1">
-        <div>
-          <p className="text-xs text-muted-foreground font-semibold">
-            {format(new Date(), "EEEE, d MMM")} · {primaryClass.name}
-          </p>
-          <h1
-            className={cn(
-              "font-black text-edu-navy mt-0.5 flex items-center gap-2",
-              isDesktop ? "text-2xl" : "text-xl"
-            )}
-          >
-            <ShieldAlert className="w-5 h-5 text-edu-red" /> Incidents
-          </h1>
-          <p className="text-[11px] text-muted-foreground mt-0.5">
-            Append-only safety + escalation log · visible to principal
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={() => openAdd()}
-          className="h-10 px-4 rounded-xl bg-edu-red text-white font-bold text-sm flex items-center gap-1 active:scale-95"
+    <>
+      <div
+        className="animate-fade-in"
+        style={{
+          padding: isDesktop ? "24px 28px 80px" : "16px 16px 80px",
+          display: "flex",
+          flexDirection: "column",
+          gap: 16,
+          width: "100%",
+        }}
+      >
+        {/* Hero */}
+        <div
+          style={{
+            position: "relative",
+            overflow: "hidden",
+            borderRadius: 28,
+            padding: isDesktop ? "22px 26px" : "18px 18px",
+            background:
+              "linear-gradient(135deg, #FFD6D6 0%, #FFEDED 55%, #FFFFFF 100%)",
+            boxShadow: PILLOW,
+          }}
         >
-          <Plus className="w-4 h-4" /> {isDesktop && "Log incident"}
-        </button>
-      </div>
+          <DotScribbles color={RED} dense />
+          <div
+            style={{
+              position: "relative",
+              zIndex: 1,
+              display: "flex",
+              alignItems: "center",
+              gap: 14,
+              flexWrap: "wrap",
+            }}
+          >
+            <span
+              style={{
+                width: 52,
+                height: 52,
+                borderRadius: 18,
+                background: `linear-gradient(135deg, ${RED}, #DC2626)`,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: 26,
+                boxShadow: `0 8px 18px ${RED}55`,
+                transform: "rotate(-8deg)",
+                flexShrink: 0,
+              }}
+              aria-hidden
+            >
+              🛡️
+            </span>
+            <div style={{ flex: 1, minWidth: 200 }}>
+              <p
+                style={{
+                  fontSize: 11,
+                  fontWeight: 800,
+                  letterSpacing: "0.16em",
+                  textTransform: "uppercase",
+                  color: RED,
+                  opacity: 0.9,
+                }}
+              >
+                Safety log
+              </p>
+              <h1
+                style={{
+                  fontSize: isDesktop ? 26 : 21,
+                  fontWeight: 800,
+                  letterSpacing: "-0.6px",
+                  color: NAVY,
+                  marginTop: 2,
+                }}
+              >
+                Incidents{" "}
+                <span
+                  aria-hidden
+                  style={{ display: "inline-block", transform: "rotate(6deg)" }}
+                >
+                  ⚠️
+                </span>
+              </h1>
+              <p
+                style={{
+                  fontSize: isDesktop ? 13 : 12,
+                  fontWeight: 500,
+                  color: "#64748B",
+                  marginTop: 4,
+                }}
+              >
+                {primaryClass.name} · {format(new Date(), "EEEE, d MMM")} ·
+                Append-only · visible to principal
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => openAdd()}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                padding: "12px 18px",
+                borderRadius: 16,
+                background: `linear-gradient(135deg, ${RED}, #DC2626)`,
+                color: "#fff",
+                fontSize: 13,
+                fontWeight: 800,
+                border: "none",
+                cursor: "pointer",
+                boxShadow: `0 10px 24px -8px ${RED}88`,
+              }}
+              className="active:scale-95 hover:-translate-y-0.5 transition"
+            >
+              <Plus size={16} strokeWidth={2.6} />
+              {isDesktop ? "Log incident" : "Log"}
+            </button>
+          </div>
+        </div>
 
-      {/* Stats strip */}
-      <div className="grid grid-cols-4 gap-2">
-        <StatTile label="Total" value={stats.total} accent="text-edu-navy" />
-        <StatTile label="Today" value={stats.today} accent="text-edu-blue" />
-        <StatTile
-          label="Unhandled"
-          value={stats.unhandled}
-          accent={stats.unhandled > 0 ? "text-edu-orange" : "text-edu-green"}
-        />
-        <StatTile
-          label="Critical"
-          value={stats.critical}
-          accent={stats.critical > 0 ? "text-edu-red" : "text-muted-foreground"}
-        />
-      </div>
+        {/* 4-stat strip */}
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+            gap: 10,
+          }}
+        >
+          <CounterCard
+            label="Total"
+            value={stats.total}
+            emoji="📋"
+            tone={NAVY}
+            surface="linear-gradient(135deg, #E1ECFF 0%, #F7FAFF 100%)"
+          />
+          <CounterCard
+            label="Today"
+            value={stats.today}
+            emoji="📅"
+            tone={SKY}
+            surface="linear-gradient(135deg, #DCEEFF 0%, #F5FAFF 100%)"
+          />
+          <CounterCard
+            label="Unhandled"
+            value={stats.unhandled}
+            emoji="⏳"
+            tone={stats.unhandled > 0 ? PEACH : MINT}
+            surface={
+              stats.unhandled > 0
+                ? "linear-gradient(135deg, #FFE0CC 0%, #FFF5EC 100%)"
+                : "linear-gradient(135deg, #D6F5E2 0%, #F1FBF5 100%)"
+            }
+          />
+          <CounterCard
+            label="Critical"
+            value={stats.critical}
+            emoji="🚨"
+            tone={stats.critical > 0 ? RED : "#94A3B8"}
+            surface={
+              stats.critical > 0
+                ? "linear-gradient(135deg, #FFD6D6 0%, #FFF1F1 100%)"
+                : "linear-gradient(135deg, #F1F5F9 0%, #FFFFFF 100%)"
+            }
+            pulse={stats.critical > 0}
+          />
+        </div>
 
-      {/* Filters */}
-      <div className={isDesktop ? "grid grid-cols-4 gap-3" : "grid grid-cols-1 gap-2"}>
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input
+        {/* Search */}
+        <div
+          style={{
+            position: "relative",
+            borderRadius: 22,
+            background: "#fff",
+            boxShadow: PILLOW,
+            padding: "4px 4px 4px 14px",
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+          }}
+        >
+          <Search size={16} color="#94A3B8" strokeWidth={2.4} />
+          <input
             placeholder="Search incidents…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="pl-9"
+            style={{
+              flex: 1,
+              background: "transparent",
+              border: "none",
+              outline: "none",
+              fontSize: 14,
+              fontWeight: 600,
+              color: "#0F172A",
+              padding: "12px 8px",
+              minWidth: 0,
+            }}
           />
+          {search && (
+            <button
+              type="button"
+              onClick={() => setSearch("")}
+              style={{
+                width: 32,
+                height: 32,
+                borderRadius: 999,
+                background: "#F1F5F9",
+                border: "none",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                cursor: "pointer",
+                flexShrink: 0,
+                marginRight: 4,
+              }}
+            >
+              <X size={14} color="#64748B" strokeWidth={2.4} />
+            </button>
+          )}
         </div>
-        <select
-          value={filterChild}
-          onChange={(e) => setFilterChild(e.target.value)}
-          className="h-10 rounded-xl border border-border bg-white px-3 text-xs font-semibold text-foreground"
-        >
-          <option value="">All children</option>
-          {roster.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name}
-            </option>
-          ))}
-        </select>
-        <select
-          value={filterType}
-          onChange={(e) => setFilterType(e.target.value as IncidentType | "")}
-          className="h-10 rounded-xl border border-border bg-white px-3 text-xs font-semibold text-foreground"
-        >
-          <option value="">All types</option>
-          {ALL_INCIDENT_TYPES.map((t) => (
-            <option key={t} value={t}>
-              {INCIDENT_TYPE_EMOJI[t]} {INCIDENT_TYPE_LABEL[t]}
-            </option>
-          ))}
-        </select>
-        <select
-          value={filterSeverity}
-          onChange={(e) => setFilterSeverity(e.target.value as IncidentSeverity | "")}
-          className="h-10 rounded-xl border border-border bg-white px-3 text-xs font-semibold text-foreground"
-        >
-          <option value="">All severities</option>
-          {ALL_SEVERITIES.map((s) => (
-            <option key={s} value={s}>
-              {SEVERITY_LABEL[s]}
-            </option>
-          ))}
-        </select>
-      </div>
 
-      {/* Show-handled toggle */}
-      <label className="inline-flex items-center gap-2 cursor-pointer text-xs text-muted-foreground">
-        <input
-          type="checkbox"
-          checked={showHandled}
-          onChange={(e) => setShowHandled(e.target.checked)}
-          className="w-3.5 h-3.5"
-        />
-        Also show handled / resolved
-      </label>
-
-      {filtersActive && (
-        <div className="flex items-center justify-between gap-2 -mt-1">
-          <p className="text-[11px] text-muted-foreground inline-flex items-center gap-1.5 flex-wrap">
-            <Filter className="w-3 h-3" />
-            Showing{" "}
-            <span className="font-bold text-edu-navy">{filtered.length}</span>{" "}
-            of {incidents.length}
-            {filterChild && roster.find((r) => r.id === filterChild) && (
-              <span className="px-1.5 py-0.5 rounded bg-secondary text-edu-navy font-semibold">
-                {roster.find((r) => r.id === filterChild)?.name.split(" ")[0]}
-              </span>
-            )}
-            {filterType && (
-              <span className="px-1.5 py-0.5 rounded bg-secondary text-edu-navy font-semibold">
-                {INCIDENT_TYPE_EMOJI[filterType]} {INCIDENT_TYPE_LABEL[filterType]}
-              </span>
-            )}
-            {filterSeverity && (
-              <span className="px-1.5 py-0.5 rounded bg-secondary text-edu-navy font-semibold">
-                {SEVERITY_LABEL[filterSeverity]}
-              </span>
-            )}
-            {showHandled && (
-              <span className="px-1.5 py-0.5 rounded bg-secondary text-edu-navy font-semibold">
-                + handled
-              </span>
-            )}
-          </p>
-          <button
-            type="button"
-            onClick={clearFilters}
-            className="text-[11px] font-bold text-edu-blue hover:underline shrink-0"
+        {/* Filters: child + type + severity selects rendered as pillow chips */}
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: isDesktop ? "repeat(3, minmax(0, 1fr))" : "1fr",
+            gap: 8,
+          }}
+        >
+          <SelectPillow
+            value={filterChild}
+            onChange={setFilterChild}
+            placeholder="👶 All children"
           >
-            Clear filters
-          </button>
+            <option value="">👶 All children</option>
+            {roster.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </SelectPillow>
+          <SelectPillow
+            value={filterType}
+            onChange={(v) => setFilterType(v as IncidentType | "")}
+            placeholder="🗂️ All types"
+          >
+            <option value="">🗂️ All types</option>
+            {ALL_INCIDENT_TYPES.map((t) => (
+              <option key={t} value={t}>
+                {INCIDENT_TYPE_EMOJI[t]} {INCIDENT_TYPE_LABEL[t]}
+              </option>
+            ))}
+          </SelectPillow>
+          <SelectPillow
+            value={filterSeverity}
+            onChange={(v) => setFilterSeverity(v as IncidentSeverity | "")}
+            placeholder="🎯 All severities"
+          >
+            <option value="">🎯 All severities</option>
+            {ALL_SEVERITIES.map((s) => (
+              <option key={s} value={s}>
+                {SEV_TONE[s].emoji} {SEVERITY_LABEL[s]}
+              </option>
+            ))}
+          </SelectPillow>
         </div>
-      )}
 
-      {filtered.length === 0 ? (
-        <Card>
-          <CardContent className="p-8 text-center">
-            <div className="text-3xl mb-2">🛡️</div>
-            <p className="text-sm font-bold text-edu-navy">
-              {filtersActive
-                ? "No matches — clear filters to see all"
-                : "No incidents recorded"}
+        {/* Show handled toggle */}
+        <label
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 8,
+            cursor: "pointer",
+            fontSize: 12,
+            fontWeight: 700,
+            color: "#64748B",
+            padding: "8px 14px",
+            borderRadius: 999,
+            background: showHandled ? `${MINT}1f` : "transparent",
+            border: `1px dashed ${showHandled ? MINT : "#CBD5E1"}`,
+            width: "fit-content",
+            transition: "all 160ms ease",
+          }}
+        >
+          <input
+            type="checkbox"
+            checked={showHandled}
+            onChange={(e) => setShowHandled(e.target.checked)}
+            style={{
+              width: 14,
+              height: 14,
+              accentColor: MINT,
+              cursor: "pointer",
+            }}
+          />
+          {showHandled ? "✓ Showing handled" : "Also show handled / resolved"}
+        </label>
+
+        {filtersActive && (
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 10,
+              flexWrap: "wrap",
+            }}
+          >
+            <p
+              style={{
+                fontSize: 11,
+                color: "#64748B",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                flexWrap: "wrap",
+              }}
+            >
+              <Filter size={11} />
+              Showing{" "}
+              <span style={{ fontWeight: 800, color: NAVY }}>
+                {filtered.length}
+              </span>{" "}
+              of {incidents.length}
+              {filterChild && roster.find((r) => r.id === filterChild) && (
+                <FilterChip>
+                  {roster.find((r) => r.id === filterChild)?.name.split(" ")[0]}
+                </FilterChip>
+              )}
+              {filterType && (
+                <FilterChip>
+                  {INCIDENT_TYPE_EMOJI[filterType]}{" "}
+                  {INCIDENT_TYPE_LABEL[filterType]}
+                </FilterChip>
+              )}
+              {filterSeverity && (
+                <FilterChip>{SEVERITY_LABEL[filterSeverity]}</FilterChip>
+              )}
+              {showHandled && <FilterChip>+ handled</FilterChip>}
             </p>
-            <p className="text-xs text-muted-foreground mt-1">
+            <button
+              type="button"
+              onClick={clearFilters}
+              style={{
+                fontSize: 11,
+                fontWeight: 800,
+                color: SKY,
+                background: "transparent",
+                border: "none",
+                cursor: "pointer",
+                textDecoration: "underline",
+                textDecorationStyle: "dotted",
+                textUnderlineOffset: 3,
+              }}
+            >
+              Clear filters
+            </button>
+          </div>
+        )}
+
+        {/* List */}
+        {filtered.length === 0 ? (
+          <div
+            style={{
+              textAlign: "center",
+              padding: "32px 16px",
+              borderRadius: 22,
+              background: "#fff",
+              boxShadow: PILLOW,
+            }}
+          >
+            <p style={{ fontSize: 32, marginBottom: 8 }} aria-hidden>
+              🛡️
+            </p>
+            <p style={{ fontSize: 14, fontWeight: 800, color: NAVY }}>
+              {filtersActive ? "No matches — clear filters to see all" : "No incidents recorded"}
+            </p>
+            <p style={{ fontSize: 12, color: "#64748B", marginTop: 4 }}>
               {filtersActive
                 ? "Your saved incident might be hidden by an active filter."
                 : "A clean log is good news. Tap + if you need to record something."}
@@ -367,317 +626,1066 @@ export default function Incidents() {
               <button
                 type="button"
                 onClick={clearFilters}
-                className="mt-3 h-9 px-4 rounded-xl bg-edu-navy text-white text-xs font-bold"
+                style={{
+                  marginTop: 14,
+                  padding: "10px 18px",
+                  borderRadius: 14,
+                  background: NAVY,
+                  color: "#fff",
+                  fontSize: 12,
+                  fontWeight: 800,
+                  border: "none",
+                  cursor: "pointer",
+                  boxShadow: `0 8px 18px -6px ${NAVY}66`,
+                }}
+                className="active:scale-95 hover:-translate-y-0.5 transition"
               >
                 Clear filters
               </button>
             )}
-          </CardContent>
-        </Card>
-      ) : (
-        <ul
-          className={cn(
-            isDesktop ? "grid grid-cols-2 xl:grid-cols-3 gap-3" : "space-y-2"
-          )}
-        >
-          {filtered.map((inc, i) => (
-            <li key={inc.id}>
-              <IncidentCard
-                incident={inc}
-                pulse={justSavedAt !== null && i === 0}
-              />
-            </li>
-          ))}
-        </ul>
-      )}
+          </div>
+        ) : (
+          <ul
+            style={{
+              display: "grid",
+              gridTemplateColumns: cardGridCols,
+              gap: 12,
+              padding: 0,
+              margin: 0,
+              listStyle: "none",
+            }}
+          >
+            {filtered.map((inc, i) => {
+              const child = roster.find((c) => c.id === inc.studentId);
+              return (
+                <li key={inc.id}>
+                  <IncidentCard
+                    incident={inc}
+                    child={child}
+                    pulse={justSavedAt !== null && i === 0}
+                  />
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </div>
 
       {/* Composer dialog */}
       {dialog && (
-        <div
-          className="fixed inset-0 z-50 flex items-end lg:items-center justify-center bg-black/40 backdrop-blur-sm animate-fade-in"
-          onClick={() => !saving && setDialog(false)}
-        >
-          <div
-            className={cn(
-              "w-full bg-white pb-[env(safe-area-inset-bottom)] max-h-[92vh] overflow-y-auto animate-slide-up",
-              isDesktop
-                ? "max-w-lg rounded-3xl shadow-2xl"
-                : "max-w-md rounded-t-3xl"
-            )}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="px-5 pt-4 pb-2 flex items-start justify-between">
-              <div>
-                <p className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground">
-                  New incident
-                </p>
-                <p className="text-lg font-black text-edu-navy">
-                  Log incident
-                </p>
-              </div>
-              <button
-                type="button"
-                disabled={saving}
-                onClick={() => setDialog(false)}
-                className="w-8 h-8 rounded-full hover:bg-secondary/50 flex items-center justify-center"
-              >
-                <X className="w-4 h-4 text-muted-foreground" />
-              </button>
-            </div>
-
-            <div className="px-5 mt-3 space-y-4">
-              <div>
-                <DialogLabel>Child</DialogLabel>
-                <select
-                  value={studentId}
-                  onChange={(e) => setStudentId(e.target.value)}
-                  className="w-full h-11 rounded-xl border border-border bg-white px-3 text-sm font-semibold"
-                >
-                  <option value="">Choose a child…</option>
-                  {roster.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <DialogLabel>Type</DialogLabel>
-                <div className="grid grid-cols-5 gap-1.5">
-                  {ALL_INCIDENT_TYPES.map((t) => (
-                    <button
-                      key={t}
-                      type="button"
-                      onClick={() => setType(t)}
-                      className={cn(
-                        "h-16 rounded-xl border-2 text-[10px] font-bold transition active:scale-95 flex flex-col items-center justify-center gap-1",
-                        type === t
-                          ? "border-edu-navy bg-edu-light-blue/30 text-edu-navy"
-                          : "border-border text-foreground bg-white"
-                      )}
-                    >
-                      <div className="text-base leading-none">
-                        {INCIDENT_TYPE_EMOJI[t]}
-                      </div>
-                      <div className="leading-tight px-1">
-                        {INCIDENT_TYPE_LABEL[t]}
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <DialogLabel>Severity</DialogLabel>
-                <div className="grid grid-cols-4 gap-2">
-                  {ALL_SEVERITIES.map((s) => {
-                    const c = SEVERITY_COLOR[s];
-                    return (
-                      <button
-                        key={s}
-                        type="button"
-                        onClick={() => setSeverity(s)}
-                        className={cn(
-                          "h-12 rounded-xl border-2 text-xs font-bold transition active:scale-95"
-                        )}
-                        style={
-                          severity === s
-                            ? {
-                                background: c.bg,
-                                color: c.fg,
-                                borderColor: c.bar,
-                              }
-                            : {
-                                background: "#fff",
-                                color: "#475569",
-                                borderColor: "#E2E8F0",
-                              }
-                        }
-                      >
-                        {SEVERITY_LABEL[s]}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <div>
-                <DialogLabel>Title</DialogLabel>
-                <Input
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  maxLength={199}
-                  placeholder="e.g. Bumped head on shelf"
-                />
-              </div>
-
-              <div>
-                <DialogLabel>What happened</DialogLabel>
-                <textarea
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  rows={4}
-                  maxLength={3999}
-                  placeholder="Where, when, who was around, how the child responded."
-                  className="w-full rounded-xl border border-border px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-edu-blue/30"
-                />
-              </div>
-
-              <div>
-                <DialogLabel>Action taken (optional)</DialogLabel>
-                <Input
-                  value={actionTaken}
-                  onChange={(e) => setActionTaken(e.target.value)}
-                  placeholder="First aid, comforted, isolated from source, etc."
-                />
-              </div>
-
-              <label
-                className="flex items-start gap-2 cursor-pointer p-3 rounded-xl border border-border bg-secondary/30 hover:bg-secondary/50"
-              >
-                <input
-                  type="checkbox"
-                  checked={parentNotified}
-                  onChange={(e) => setParentNotified(e.target.checked)}
-                  className="mt-0.5 w-4 h-4"
-                />
-                <span className="text-xs text-foreground/90 leading-relaxed">
-                  <strong>Parent has been notified</strong> about this incident
-                  (phone, WhatsApp, or in person). Timestamp gets recorded.
-                </span>
-              </label>
-            </div>
-
-            <div className="px-5 mt-4 pb-5">
-              <button
-                type="button"
-                disabled={saving}
-                onClick={submit}
-                className="w-full h-12 rounded-xl bg-edu-red text-white font-bold flex items-center justify-center gap-2 disabled:opacity-50 active:scale-95 transition"
-              >
-                {saving ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <ShieldAlert className="w-4 h-4" />
-                )}
-                Log incident
-              </button>
-              <p className="text-[10px] text-muted-foreground text-center mt-2">
-                Incidents are append-only and visible to your principal.
-                Cannot be deleted after submission.
-              </p>
-            </div>
-          </div>
-        </div>
+        <ComposerDialog
+          isDesktop={isDesktop}
+          studentId={studentId}
+          setStudentId={setStudentId}
+          type={type}
+          setType={setType}
+          severity={severity}
+          setSeverity={setSeverity}
+          title={title}
+          setTitle={setTitle}
+          description={description}
+          setDescription={setDescription}
+          actionTaken={actionTaken}
+          setActionTaken={setActionTaken}
+          parentNotified={parentNotified}
+          setParentNotified={setParentNotified}
+          saving={saving}
+          onSubmit={submit}
+          onClose={() => !saving && setDialog(false)}
+          roster={roster}
+        />
       )}
+    </>
+  );
+}
+
+/* ═══════════════════════ building blocks ═══════════════════════ */
+
+function CenteredLoader({ label }: { label: string }) {
+  return (
+    <div
+      style={{
+        padding: "48px 16px",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        gap: 12,
+        color: "#64748B",
+      }}
+    >
+      <Loader2 className="animate-spin" />
+      <p style={{ fontSize: 12, fontWeight: 600 }}>{label}</p>
     </div>
   );
 }
 
-// ─────────────────────────────────────────────────────────────
-// Atoms
-// ─────────────────────────────────────────────────────────────
-
-function StatTile({
+function CounterCard({
   label,
   value,
-  accent,
+  emoji,
+  tone,
+  surface,
+  pulse,
 }: {
   label: string;
   value: number;
-  accent: string;
+  emoji: string;
+  tone: string;
+  surface: string;
+  pulse?: boolean;
 }) {
   return (
-    <Card>
-      <CardContent className="p-3 text-center">
-        <p className={cn("text-2xl font-black", accent)}>{value}</p>
-        <p className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground mt-0.5">
-          {label}
-        </p>
-      </CardContent>
-    </Card>
+    <div
+      style={{
+        position: "relative",
+        overflow: "hidden",
+        borderRadius: 22,
+        padding: "12px 12px 10px",
+        background: surface,
+        boxShadow: PILLOW,
+        animation: pulse ? "pulse 2s ease-in-out infinite" : undefined,
+      }}
+    >
+      <DotScribbles color={tone} />
+      <div
+        style={{
+          display: "flex",
+          alignItems: "baseline",
+          justifyContent: "space-between",
+          position: "relative",
+          zIndex: 1,
+        }}
+      >
+        <span
+          style={{
+            fontSize: 28,
+            fontWeight: 900,
+            letterSpacing: "-1.2px",
+            color: tone,
+            lineHeight: 1,
+          }}
+        >
+          {value}
+        </span>
+        <span
+          style={{
+            fontSize: 20,
+            lineHeight: 1,
+            transform: "rotate(8deg)",
+            filter: "drop-shadow(0 3px 6px rgba(0,0,0,0.08))",
+          }}
+          aria-hidden
+        >
+          {emoji}
+        </span>
+      </div>
+      <p
+        style={{
+          fontSize: 10,
+          fontWeight: 800,
+          letterSpacing: "0.12em",
+          textTransform: "uppercase",
+          color: tone,
+          opacity: 0.75,
+          marginTop: 6,
+          position: "relative",
+          zIndex: 1,
+        }}
+      >
+        {label}
+      </p>
+    </div>
   );
 }
 
-function DialogLabel({ children }: { children: React.ReactNode }) {
+function SelectPillow({
+  value,
+  onChange,
+  placeholder,
+  children,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+  children: React.ReactNode;
+}) {
+  void placeholder;
   return (
-    <label className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground mb-1.5 block">
+    <div
+      style={{
+        position: "relative",
+        borderRadius: 16,
+        background: "#fff",
+        boxShadow: PILLOW,
+      }}
+    >
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        style={{
+          width: "100%",
+          height: 44,
+          padding: "0 14px",
+          borderRadius: 16,
+          background: "transparent",
+          border: "none",
+          fontSize: 12,
+          fontWeight: 700,
+          color: NAVY,
+          outline: "none",
+          appearance: "none",
+          cursor: "pointer",
+        }}
+      >
+        {children}
+      </select>
+      <span
+        aria-hidden
+        style={{
+          position: "absolute",
+          right: 14,
+          top: "50%",
+          transform: "translateY(-50%)",
+          fontSize: 10,
+          color: "#94A3B8",
+          pointerEvents: "none",
+        }}
+      >
+        ▼
+      </span>
+    </div>
+  );
+}
+
+function FilterChip({ children }: { children: React.ReactNode }) {
+  return (
+    <span
+      style={{
+        padding: "2px 8px",
+        borderRadius: 999,
+        background: "#F1F5F9",
+        color: NAVY,
+        fontWeight: 800,
+        fontSize: 10,
+      }}
+    >
       {children}
-    </label>
+    </span>
   );
 }
 
 function IncidentCard({
   incident,
+  child,
   pulse,
 }: {
   incident: Incident;
+  child: { name: string } | undefined;
   pulse: boolean;
 }) {
-  const c = SEVERITY_COLOR[incident.severity];
+  const sev = SEV_TONE[incident.severity];
   return (
-    <Card
-      className={cn(
-        pulse && "ring-2 ring-edu-green ring-offset-2 animate-pulse"
-      )}
-      style={{ borderLeft: `4px solid ${c.bar}` }}
+    <div
+      style={{
+        position: "relative",
+        overflow: "hidden",
+        borderRadius: 22,
+        padding: 14,
+        background: sev.surface,
+        boxShadow: pulse
+          ? `${PILLOW}, 0 0 0 3px ${MINT}88`
+          : PILLOW,
+        borderLeft: `5px solid ${sev.bar}`,
+        display: "flex",
+        flexDirection: "column",
+        gap: 10,
+        animation: pulse ? "pulse 1.4s ease-in-out infinite" : undefined,
+      }}
     >
-      <CardContent className="p-3 space-y-2">
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-1.5 flex-wrap mb-1">
-              <span
-                className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full"
-                style={{ background: c.bg, color: c.fg }}
-              >
-                {SEVERITY_LABEL[incident.severity]}
-              </span>
-              <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-secondary text-edu-navy border border-border inline-flex items-center gap-1">
-                {INCIDENT_TYPE_EMOJI[incident.type]}{" "}
-                {INCIDENT_TYPE_LABEL[incident.type]}
-              </span>
-              {incident.handled ? (
-                <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-edu-light-green text-edu-green border border-edu-green/30 inline-flex items-center gap-1">
-                  <CheckCircle2 className="w-2.5 h-2.5" /> Handled
-                </span>
-              ) : (
-                <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-edu-light-orange text-edu-orange border border-edu-orange/30 inline-flex items-center gap-1">
-                  <Clock className="w-2.5 h-2.5" /> Pending
-                </span>
-              )}
-            </div>
-            <p className="text-sm font-bold text-edu-navy">{incident.title}</p>
-            <p className="text-[11px] text-muted-foreground">
-              {incident.studentName} ·{" "}
-              {format(new Date(incident.createdAt), "d MMM · h:mm a")}
-            </p>
+      <DotScribbles color={sev.tone} />
+
+      {/* Header row: child avatar + severity pill + type pill + status pill */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "flex-start",
+          gap: 12,
+          position: "relative",
+          zIndex: 1,
+        }}
+      >
+        <CartoonAvatar
+          name={incident.studentName}
+          size={42}
+          ringColor={sev.bar}
+          ringWidth={3}
+        />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <p
+            style={{
+              fontSize: 14,
+              fontWeight: 800,
+              color: NAVY,
+              letterSpacing: "-0.2px",
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+            }}
+          >
+            {incident.title}
+          </p>
+          <p
+            style={{
+              fontSize: 11,
+              fontWeight: 600,
+              color: "#64748B",
+              marginTop: 2,
+            }}
+          >
+            {(child?.name || incident.studentName).split(" ")[0]} ·{" "}
+            {format(new Date(incident.createdAt), "d MMM · h:mm a")}
+          </p>
+          <div
+            style={{
+              display: "flex",
+              gap: 6,
+              flexWrap: "wrap",
+              marginTop: 8,
+            }}
+          >
+            <SevPill severity={incident.severity} />
+            <TypePill type={incident.type} />
+            <HandledPill handled={incident.handled} />
           </div>
         </div>
-        <p className="text-xs text-foreground/90 leading-relaxed whitespace-pre-wrap">
-          {incident.description}
-        </p>
-        {incident.actionTaken && (
-          <p className="text-[11px] text-muted-foreground">
-            <span className="font-bold text-edu-navy">Action:</span>{" "}
-            {incident.actionTaken}
-          </p>
-        )}
-        <div className="flex items-center justify-between gap-2 pt-1 border-t border-border">
-          <span className="text-[10px] text-muted-foreground">
-            — {incident.createdByName || "Teacher"}
-          </span>
-          {incident.parentNotified ? (
-            <span className="text-[10px] font-semibold text-edu-green inline-flex items-center gap-1">
-              <CheckCircle2 className="w-2.5 h-2.5" /> Parent notified
-            </span>
-          ) : (
-            <span className="text-[10px] font-semibold text-edu-orange inline-flex items-center gap-1">
-              <AlertTriangle className="w-2.5 h-2.5" /> Parent not notified
-            </span>
-          )}
+      </div>
+
+      {/* Description */}
+      <p
+        style={{
+          fontSize: 12,
+          color: "#0F172A",
+          lineHeight: 1.55,
+          whiteSpace: "pre-wrap",
+          position: "relative",
+          zIndex: 1,
+        }}
+      >
+        {incident.description}
+      </p>
+
+      {/* Action taken */}
+      {incident.actionTaken && (
+        <div
+          style={{
+            position: "relative",
+            zIndex: 1,
+            padding: "8px 10px",
+            background: "#fff",
+            borderRadius: 12,
+            fontSize: 11,
+            color: "#0F172A",
+            boxShadow: "inset 0 0 0 1px rgba(15,23,42,0.08)",
+          }}
+        >
+          <span style={{ fontWeight: 800, color: sev.tone }}>🩹 Action:</span>{" "}
+          {incident.actionTaken}
         </div>
-      </CardContent>
-    </Card>
+      )}
+
+      {/* Footer: created by + parent notified */}
+      <div
+        style={{
+          position: "relative",
+          zIndex: 1,
+          paddingTop: 8,
+          borderTop: "1px dashed rgba(15,23,42,0.12)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 8,
+        }}
+      >
+        <span style={{ fontSize: 10, fontWeight: 600, color: "#94A3B8" }}>
+          — {incident.createdByName || "Teacher"}
+        </span>
+        {incident.parentNotified ? (
+          <span
+            style={{
+              fontSize: 10,
+              fontWeight: 800,
+              color: "#047857",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 4,
+              padding: "3px 8px",
+              borderRadius: 999,
+              background: "#fff",
+              boxShadow: `inset 0 0 0 1px ${MINT}55`,
+            }}
+          >
+            <CheckCircle2 size={10} strokeWidth={3} /> Parent notified
+          </span>
+        ) : (
+          <span
+            style={{
+              fontSize: 10,
+              fontWeight: 800,
+              color: "#92400E",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 4,
+              padding: "3px 8px",
+              borderRadius: 999,
+              background: "#fff",
+              boxShadow: `inset 0 0 0 1px ${BUTTER}55`,
+            }}
+          >
+            <AlertTriangle size={10} strokeWidth={2.6} /> Parent not notified
+          </span>
+        )}
+      </div>
+    </div>
   );
 }
+
+function SevPill({ severity }: { severity: IncidentSeverity }) {
+  const sev = SEV_TONE[severity];
+  return (
+    <span
+      style={{
+        fontSize: 9,
+        fontWeight: 900,
+        letterSpacing: "0.08em",
+        textTransform: "uppercase",
+        color: "#fff",
+        background: `linear-gradient(135deg, ${sev.tone}, ${sev.tone}cc)`,
+        padding: "3px 8px",
+        borderRadius: 999,
+        boxShadow: `0 3px 8px ${sev.tone}44`,
+      }}
+    >
+      {sev.emoji} {SEVERITY_LABEL[severity]}
+    </span>
+  );
+}
+
+function TypePill({ type }: { type: IncidentType }) {
+  return (
+    <span
+      style={{
+        fontSize: 9,
+        fontWeight: 800,
+        letterSpacing: "0.06em",
+        textTransform: "uppercase",
+        color: NAVY,
+        background: "#fff",
+        padding: "3px 8px",
+        borderRadius: 999,
+        boxShadow: "inset 0 0 0 1px #CBD5E1",
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 4,
+      }}
+    >
+      {INCIDENT_TYPE_EMOJI[type]} {INCIDENT_TYPE_LABEL[type]}
+    </span>
+  );
+}
+
+function HandledPill({ handled }: { handled: boolean }) {
+  return (
+    <span
+      style={{
+        fontSize: 9,
+        fontWeight: 900,
+        letterSpacing: "0.06em",
+        textTransform: "uppercase",
+        color: handled ? "#047857" : "#92400E",
+        background: handled ? `${MINT}1f` : `${BUTTER}1f`,
+        padding: "3px 8px",
+        borderRadius: 999,
+        boxShadow: `inset 0 0 0 1px ${handled ? MINT : BUTTER}55`,
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 4,
+      }}
+    >
+      {handled ? (
+        <>
+          <CheckCircle2 size={10} strokeWidth={3} /> Handled
+        </>
+      ) : (
+        <>
+          <Clock size={10} strokeWidth={2.6} /> Pending
+        </>
+      )}
+    </span>
+  );
+}
+
+/* ═══════════════════════ Composer ═══════════════════════ */
+
+function ComposerDialog({
+  isDesktop,
+  studentId,
+  setStudentId,
+  type,
+  setType,
+  severity,
+  setSeverity,
+  title,
+  setTitle,
+  description,
+  setDescription,
+  actionTaken,
+  setActionTaken,
+  parentNotified,
+  setParentNotified,
+  saving,
+  onSubmit,
+  onClose,
+  roster,
+}: {
+  isDesktop: boolean;
+  studentId: string;
+  setStudentId: (v: string) => void;
+  type: IncidentType;
+  setType: (v: IncidentType) => void;
+  severity: IncidentSeverity;
+  setSeverity: (v: IncidentSeverity) => void;
+  title: string;
+  setTitle: (v: string) => void;
+  description: string;
+  setDescription: (v: string) => void;
+  actionTaken: string;
+  setActionTaken: (v: string) => void;
+  parentNotified: boolean;
+  setParentNotified: (v: boolean) => void;
+  saving: boolean;
+  onSubmit: () => void;
+  onClose: () => void;
+  roster: { id: string; name: string }[];
+}) {
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 50,
+        background: "rgba(15,23,42,0.5)",
+        backdropFilter: "blur(4px)",
+        WebkitBackdropFilter: "blur(4px)",
+        display: "flex",
+        alignItems: isDesktop ? "center" : "flex-end",
+        justifyContent: "center",
+        animation: "fade-in 200ms ease-out",
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          width: "100%",
+          maxWidth: isDesktop ? 540 : 480,
+          maxHeight: isDesktop ? "92vh" : "94vh",
+          overflowY: "auto",
+          background:
+            "linear-gradient(180deg, #FFF1F1 0%, #FFFFFF 28%, #FFFFFF 100%)",
+          borderRadius: isDesktop ? 28 : "28px 28px 0 0",
+          boxShadow: "0 -20px 60px rgba(15,23,42,0.18)",
+          animation: "slide-up 240ms cubic-bezier(.34,1.56,.64,1)",
+          position: "relative",
+          margin: isDesktop ? "0 16px" : 0,
+          paddingBottom: "env(safe-area-inset-bottom)",
+        }}
+      >
+        {/* Sticky header */}
+        <div
+          style={{
+            position: "sticky",
+            top: 0,
+            background:
+              "linear-gradient(180deg, rgba(255,241,241,0.95) 0%, rgba(255,255,255,0.85) 100%)",
+            backdropFilter: "blur(10px)",
+            WebkitBackdropFilter: "blur(10px)",
+            padding: isDesktop ? "16px 22px 14px" : "10px 18px 12px",
+            zIndex: 10,
+            borderRadius: isDesktop ? "28px 28px 0 0" : "28px 28px 0 0",
+          }}
+        >
+          {!isDesktop && (
+            <div
+              style={{
+                width: 48,
+                height: 5,
+                borderRadius: 999,
+                background: "#E2E8F0",
+                margin: "0 auto 12px",
+              }}
+            />
+          )}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "flex-start",
+              justifyContent: "space-between",
+              gap: 12,
+            }}
+          >
+            <div>
+              <p
+                style={{
+                  fontSize: 10,
+                  fontWeight: 800,
+                  letterSpacing: "0.16em",
+                  textTransform: "uppercase",
+                  color: RED,
+                  opacity: 0.85,
+                }}
+              >
+                New incident
+              </p>
+              <p
+                style={{
+                  fontSize: 20,
+                  fontWeight: 800,
+                  color: NAVY,
+                  marginTop: 2,
+                  letterSpacing: "-0.4px",
+                }}
+              >
+                Log incident{" "}
+                <span
+                  aria-hidden
+                  style={{ display: "inline-block", transform: "rotate(-6deg)" }}
+                >
+                  📝
+                </span>
+              </p>
+            </div>
+            <button
+              type="button"
+              disabled={saving}
+              onClick={onClose}
+              aria-label="Close"
+              style={{
+                width: 34,
+                height: 34,
+                borderRadius: 999,
+                background: "#F1F5F9",
+                border: "none",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                cursor: saving ? "default" : "pointer",
+                flexShrink: 0,
+              }}
+            >
+              <X size={16} color="#64748B" strokeWidth={2.4} />
+            </button>
+          </div>
+        </div>
+
+        <div
+          style={{
+            padding: isDesktop ? "16px 22px 24px" : "12px 18px 24px",
+            display: "flex",
+            flexDirection: "column",
+            gap: 16,
+          }}
+        >
+          {/* Child */}
+          <div>
+            <FieldLabel tone={NAVY} emoji="👶">Child</FieldLabel>
+            <SelectPillow
+              value={studentId}
+              onChange={setStudentId}
+              placeholder="Choose a child…"
+            >
+              <option value="">Choose a child…</option>
+              {roster.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </SelectPillow>
+          </div>
+
+          {/* Type tiles */}
+          <div>
+            <FieldLabel tone={NAVY} emoji="🗂️">Type</FieldLabel>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(5, minmax(0, 1fr))",
+                gap: 6,
+              }}
+            >
+              {ALL_INCIDENT_TYPES.map((t) => {
+                const selected = type === t;
+                return (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => setType(t)}
+                    style={{
+                      aspectRatio: "3 / 4",
+                      borderRadius: 18,
+                      background: selected
+                        ? "linear-gradient(135deg, #E1ECFF 0%, #F7FAFF 100%)"
+                        : "#fff",
+                      boxShadow: selected
+                        ? `inset 0 0 0 2px ${NAVY}, ${PILLOW}`
+                        : PILLOW,
+                      border: "none",
+                      cursor: "pointer",
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: 4,
+                      padding: 6,
+                      transition: "transform 140ms ease",
+                    }}
+                    className="active:scale-95"
+                  >
+                    <span
+                      style={{
+                        fontSize: 22,
+                        transform: selected ? "rotate(-8deg)" : "none",
+                        transition: "transform 200ms ease",
+                      }}
+                      aria-hidden
+                    >
+                      {INCIDENT_TYPE_EMOJI[t]}
+                    </span>
+                    <span
+                      style={{
+                        fontSize: 10,
+                        fontWeight: 800,
+                        color: selected ? NAVY : "#475569",
+                      }}
+                    >
+                      {INCIDENT_TYPE_LABEL[t]}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Severity tiles */}
+          <div>
+            <FieldLabel tone={NAVY} emoji="🎯">Severity</FieldLabel>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+                gap: 6,
+              }}
+            >
+              {ALL_SEVERITIES.map((s) => {
+                const sev = SEV_TONE[s];
+                const selected = severity === s;
+                return (
+                  <button
+                    key={s}
+                    type="button"
+                    onClick={() => setSeverity(s)}
+                    style={{
+                      height: 56,
+                      borderRadius: 16,
+                      background: selected
+                        ? `linear-gradient(135deg, ${sev.tone}, ${sev.tone}cc)`
+                        : "#fff",
+                      color: selected ? "#fff" : "#475569",
+                      boxShadow: selected
+                        ? `0 8px 18px -6px ${sev.tone}66`
+                        : PILLOW,
+                      border: "none",
+                      cursor: "pointer",
+                      fontSize: 12,
+                      fontWeight: 800,
+                      letterSpacing: "-0.1px",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: 5,
+                      transition: "transform 140ms ease",
+                    }}
+                    className="active:scale-95"
+                  >
+                    <span aria-hidden>{sev.emoji}</span>
+                    {SEVERITY_LABEL[s]}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Title */}
+          <div>
+            <FieldLabel tone={NAVY} emoji="📝">Title</FieldLabel>
+            <PillowInput
+              value={title}
+              onChange={setTitle}
+              placeholder="e.g. Bumped head on shelf"
+              maxLength={199}
+            />
+          </div>
+
+          {/* Description */}
+          <div>
+            <FieldLabel tone={NAVY} emoji="💬">What happened</FieldLabel>
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              rows={4}
+              maxLength={3999}
+              placeholder="Where, when, who was around, how the child responded."
+              style={{
+                width: "100%",
+                padding: "12px 14px",
+                borderRadius: 16,
+                background: "#fff",
+                border: "none",
+                fontSize: 13,
+                fontWeight: 500,
+                color: "#0F172A",
+                outline: "none",
+                resize: "none",
+                boxShadow: PILLOW,
+                fontFamily: "inherit",
+                lineHeight: 1.55,
+              }}
+            />
+          </div>
+
+          {/* Action taken */}
+          <div>
+            <FieldLabel tone={NAVY} emoji="🩹">Action taken (optional)</FieldLabel>
+            <PillowInput
+              value={actionTaken}
+              onChange={setActionTaken}
+              placeholder="First aid, comforted, isolated from source, etc."
+            />
+          </div>
+
+          {/* Parent notified toggle */}
+          <label
+            style={{
+              position: "relative",
+              overflow: "hidden",
+              display: "flex",
+              alignItems: "flex-start",
+              gap: 10,
+              padding: 14,
+              borderRadius: 18,
+              background: parentNotified
+                ? "linear-gradient(135deg, #D6F5E2 0%, #F1FBF5 100%)"
+                : "linear-gradient(135deg, #F8FAFC 0%, #FFFFFF 100%)",
+              boxShadow: PILLOW,
+              cursor: "pointer",
+            }}
+          >
+            <DotScribbles color={parentNotified ? MINT : NAVY} />
+            <input
+              type="checkbox"
+              checked={parentNotified}
+              onChange={(e) => setParentNotified(e.target.checked)}
+              style={{
+                marginTop: 2,
+                width: 16,
+                height: 16,
+                accentColor: MINT,
+                cursor: "pointer",
+                position: "relative",
+                zIndex: 1,
+              }}
+            />
+            <span
+              style={{
+                fontSize: 12,
+                color: "#0F172A",
+                lineHeight: 1.55,
+                fontWeight: 500,
+                position: "relative",
+                zIndex: 1,
+              }}
+            >
+              <strong style={{ color: parentNotified ? "#047857" : NAVY }}>
+                Parent has been notified
+              </strong>{" "}
+              about this incident (phone, WhatsApp, or in person). Timestamp
+              gets recorded.
+            </span>
+          </label>
+
+          {/* Submit */}
+          <button
+            type="button"
+            disabled={saving}
+            onClick={onSubmit}
+            style={{
+              width: "100%",
+              padding: "14px 18px",
+              borderRadius: 18,
+              background: saving
+                ? "#CBD5E1"
+                : `linear-gradient(135deg, ${RED}, #DC2626)`,
+              color: "#fff",
+              fontSize: 14,
+              fontWeight: 800,
+              letterSpacing: "-0.1px",
+              border: "none",
+              cursor: saving ? "default" : "pointer",
+              boxShadow: saving ? "none" : `0 12px 28px -8px ${RED}88`,
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 8,
+            }}
+            className="active:scale-95 hover:-translate-y-0.5 transition"
+          >
+            {saving ? (
+              <Loader2 size={16} className="animate-spin" />
+            ) : (
+              <ShieldAlert size={16} strokeWidth={2.4} />
+            )}
+            Log incident
+          </button>
+          <p
+            style={{
+              fontSize: 10,
+              textAlign: "center",
+              color: "#94A3B8",
+              lineHeight: 1.55,
+            }}
+          >
+            Incidents are append-only and visible to your principal. Cannot be
+            deleted after submission.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function FieldLabel({
+  tone,
+  emoji,
+  children,
+}: {
+  tone: string;
+  emoji?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 6,
+        marginBottom: 8,
+      }}
+    >
+      {emoji && (
+        <span
+          aria-hidden
+          style={{
+            fontSize: 13,
+            transform: "rotate(-6deg)",
+            display: "inline-block",
+          }}
+        >
+          {emoji}
+        </span>
+      )}
+      <p
+        style={{
+          fontSize: 10,
+          fontWeight: 800,
+          letterSpacing: "0.14em",
+          textTransform: "uppercase",
+          color: tone,
+          opacity: 0.75,
+        }}
+      >
+        {children}
+      </p>
+    </div>
+  );
+}
+
+function PillowInput({
+  value,
+  onChange,
+  placeholder,
+  maxLength,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+  maxLength?: number;
+}) {
+  return (
+    <input
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      placeholder={placeholder}
+      maxLength={maxLength}
+      style={{
+        width: "100%",
+        padding: "12px 14px",
+        borderRadius: 16,
+        background: "#fff",
+        border: "none",
+        fontSize: 13,
+        fontWeight: 600,
+        color: "#0F172A",
+        outline: "none",
+        boxShadow: PILLOW,
+      }}
+    />
+  );
+}
+
+function DotScribbles({
+  color,
+  dense = false,
+}: {
+  color: string;
+  dense?: boolean;
+}) {
+  return (
+    <svg
+      aria-hidden="true"
+      width="100%"
+      height="100%"
+      style={{
+        position: "absolute",
+        inset: 0,
+        opacity: dense ? 0.1 : 0.07,
+        pointerEvents: "none",
+      }}
+    >
+      <circle cx="14%" cy="24%" r="2.5" fill={color} />
+      <circle cx="82%" cy="14%" r="1.8" fill={color} />
+      <circle cx="68%" cy="62%" r="2" fill={color} />
+      <circle cx="22%" cy="80%" r="1.6" fill={color} />
+      <circle cx="48%" cy="32%" r="1.4" fill={color} />
+      {dense && (
+        <>
+          <circle cx="90%" cy="80%" r="2.2" fill={color} />
+          <circle cx="6%" cy="60%" r="1.4" fill={color} />
+          <circle cx="55%" cy="88%" r="1.6" fill={color} />
+        </>
+      )}
+    </svg>
+  );
+}
+
+// Palette constants reserved for future variants on this page.
+void BLUSH;
+void LAV;

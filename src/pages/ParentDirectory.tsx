@@ -3,9 +3,8 @@
  * pre-primary teacher. NOT a chat surface — purely a contact directory
  * with one-tap deep-links to WhatsApp / phone / email.
  *
- * For emergencies, picnic announcements, sub-teacher days. Privacy:
- * teacher sees parents of CHILDREN IN THEIR CLASS ONLY. There's no
- * parent-side equivalent of this page.
+ * Cartoonified 2026-05-25. Same sherbet palette + CartoonAvatar
+ * vocabulary as Roster / Attendance / Pickup / Safety.
  */
 import { useMemo, useState } from "react";
 import {
@@ -13,8 +12,6 @@ import {
   MessageCircle,
   Mail,
   Search,
-  Users,
-  Sparkles,
   AlertTriangle,
   X,
 } from "lucide-react";
@@ -22,15 +19,23 @@ import { format } from "date-fns";
 import { useTeacherClass } from "@/hooks/useTeacherClass";
 import { useClassRoster, type RosterChild } from "@/hooks/useClassRoster";
 import { useIsDesktop } from "@/hooks/useIsDesktop";
-import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { cn } from "@/lib/utils";
+import { CartoonAvatar } from "@/components/CartoonAvatar";
+
+const NAVY = "#1e3272";
+const MINT = "#10B981";
+const PEACH = "#FB923C";
+const BLUSH = "#EC4899";
+const SKY = "#0EA5E9";
+const LAV = "#A78BFA";
+const BUTTER = "#F59E0B";
+const RED = "#EF4444";
+
+const PILLOW =
+  "0 1px 0 rgba(255,255,255,0.55) inset, 0 14px 32px -10px rgba(30,50,114,0.16), 0 4px 10px rgba(30,50,114,0.06)";
 
 function cleanPhone(raw?: string): string {
   if (!raw) return "";
-  // Strip everything except digits + leading +
   const digits = raw.replace(/[^\d+]/g, "");
-  // If no country code, assume +91 (India default — Edullent's target market)
   if (digits.startsWith("+")) return digits;
   if (digits.startsWith("91") && digits.length === 12) return `+${digits}`;
   if (digits.length === 10) return `+91${digits}`;
@@ -72,7 +77,14 @@ export default function ParentDirectory() {
 
   if (classLoading || rosterLoading) {
     return (
-      <div className="px-4 py-12 text-center text-xs text-muted-foreground">
+      <div
+        style={{
+          padding: "48px 16px",
+          textAlign: "center",
+          color: "#64748B",
+          fontSize: 12,
+        }}
+      >
         Loading directory…
       </div>
     );
@@ -80,138 +92,431 @@ export default function ParentDirectory() {
 
   if (!primaryClass) {
     return (
-      <div className="px-4 py-12 text-center">
-        <p className="text-sm font-bold text-edu-navy">No class assigned</p>
+      <div style={{ padding: "48px 16px", textAlign: "center" }}>
+        <p style={{ fontSize: 16, fontWeight: 800, color: NAVY }}>
+          🌱 No class assigned
+        </p>
       </div>
     );
   }
 
+  const listCols = isDesktop ? "repeat(3, minmax(0, 1fr))" : "1fr";
+
   return (
     <>
       <div
-        className={cn(
-          "py-4 space-y-4 animate-fade-in",
-          isDesktop ? "px-6 lg:px-10 max-w-7xl mx-auto" : "px-4"
-        )}
+        className="animate-fade-in"
+        style={{
+          padding: isDesktop ? "24px 28px 80px" : "16px 16px 80px",
+          display: "flex",
+          flexDirection: "column",
+          gap: 16,
+          width: "100%",
+        }}
       >
-        {/* Header */}
-        <div className="flex items-center gap-2 pt-1">
+        {/* Hero */}
+        <div
+          style={{
+            position: "relative",
+            overflow: "hidden",
+            borderRadius: 28,
+            padding: isDesktop ? "22px 26px" : "18px 18px",
+            background:
+              "linear-gradient(135deg, #DCEEFF 0%, #F5FAFF 55%, #FFFFFF 100%)",
+            boxShadow: PILLOW,
+          }}
+        >
+          <DotScribbles color={SKY} dense />
           <div
-            className={cn(
-              "rounded-xl bg-edu-light-blue text-edu-blue flex items-center justify-center",
-              isDesktop ? "w-10 h-10" : "w-9 h-9"
-            )}
+            style={{
+              position: "relative",
+              zIndex: 1,
+              display: "flex",
+              alignItems: "center",
+              gap: 14,
+              flexWrap: "wrap",
+            }}
           >
-            <Users className={isDesktop ? "w-5 h-5" : "w-4 h-4"} />
-          </div>
-          <div>
-            <h1
-              className={cn(
-                "font-black text-edu-navy leading-none",
-                isDesktop ? "text-2xl" : "text-xl"
-              )}
+            <span
+              style={{
+                width: 52,
+                height: 52,
+                borderRadius: 18,
+                background: `linear-gradient(135deg, ${SKY}, #0284C7)`,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: 26,
+                boxShadow: `0 8px 18px ${SKY}55`,
+                transform: "rotate(-8deg)",
+                flexShrink: 0,
+              }}
+              aria-hidden
             >
-              Parent Directory
-            </h1>
-            <p className="text-[11px] text-muted-foreground mt-1 font-semibold">
-              {primaryClass.name} · {format(new Date(), "EEEE, d MMM")}
-            </p>
+              📒
+            </span>
+            <div style={{ flex: 1, minWidth: 200 }}>
+              <p
+                style={{
+                  fontSize: 11,
+                  fontWeight: 800,
+                  letterSpacing: "0.16em",
+                  textTransform: "uppercase",
+                  color: SKY,
+                  opacity: 0.9,
+                }}
+              >
+                Class contacts
+              </p>
+              <h1
+                style={{
+                  fontSize: isDesktop ? 26 : 21,
+                  fontWeight: 800,
+                  letterSpacing: "-0.6px",
+                  color: NAVY,
+                  marginTop: 2,
+                }}
+              >
+                Parent Directory{" "}
+                <span
+                  aria-hidden
+                  style={{ display: "inline-block", transform: "rotate(6deg)" }}
+                >
+                  💌
+                </span>
+              </h1>
+              <p
+                style={{
+                  fontSize: isDesktop ? 13 : 12,
+                  fontWeight: 500,
+                  color: "#64748B",
+                  marginTop: 4,
+                }}
+              >
+                {primaryClass.name} · {format(new Date(), "EEEE, d MMM")} ·{" "}
+                {roster.length} {roster.length === 1 ? "family" : "families"}
+              </p>
+            </div>
           </div>
         </div>
 
-        {/* Stats banner */}
-        <div className="rounded-2xl bg-gradient-to-br from-edu-blue to-edu-navy text-white p-4 shadow-md">
-          <div className="flex items-center gap-2 text-[10px] uppercase tracking-widest text-white/70 font-bold">
-            <Sparkles className="w-3 h-3" /> Coverage
-          </div>
-          <div className="grid grid-cols-3 gap-3 mt-2">
-            <Stat label="Reachable" value={stats.withAny} total={stats.total} />
-            <Stat label="Phone" value={stats.withPhone} total={stats.total} />
-            <Stat label="Email" value={stats.withEmail} total={stats.total} />
-          </div>
+        {/* 3-stat strip */}
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+            gap: 10,
+          }}
+        >
+          <CounterCard
+            label="Reachable"
+            value={stats.withAny}
+            total={stats.total}
+            emoji="📞"
+            tone={MINT}
+            surface="linear-gradient(135deg, #D6F5E2 0%, #F1FBF5 100%)"
+          />
+          <CounterCard
+            label="Phone"
+            value={stats.withPhone}
+            total={stats.total}
+            emoji="📱"
+            tone={SKY}
+            surface="linear-gradient(135deg, #DCEEFF 0%, #F5FAFF 100%)"
+          />
+          <CounterCard
+            label="Email"
+            value={stats.withEmail}
+            total={stats.total}
+            emoji="💌"
+            tone={LAV}
+            surface="linear-gradient(135deg, #EDE2FF 0%, #F8F3FF 100%)"
+          />
         </div>
 
         {/* Missing-contact warning */}
         {stats.withAny < stats.total && (
-          <Card className="bg-edu-light-yellow/40 border-edu-yellow/40">
-            <CardContent className="p-3 text-[11px] text-foreground/80 flex items-start gap-2">
-              <AlertTriangle className="w-4 h-4 text-edu-yellow shrink-0 mt-0.5" />
-              <p>
-                <strong>{stats.total - stats.withAny}</strong> child
-                {stats.total - stats.withAny === 1 ? "" : "ren"} have no parent
-                contact on file. Ask principal to update their PreStudents
-                record for emergency access.
-              </p>
-            </CardContent>
-          </Card>
+          <div
+            style={{
+              position: "relative",
+              overflow: "hidden",
+              borderRadius: 22,
+              padding: "12px 16px",
+              background: "linear-gradient(135deg, #FFEBC8 0%, #FFF7E5 100%)",
+              boxShadow: PILLOW,
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+            }}
+          >
+            <DotScribbles color={BUTTER} />
+            <span
+              style={{
+                position: "relative",
+                zIndex: 1,
+                width: 36,
+                height: 36,
+                borderRadius: 12,
+                background: `linear-gradient(135deg, ${BUTTER}, ${PEACH})`,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                color: "#fff",
+                boxShadow: `0 6px 14px ${BUTTER}55`,
+                flexShrink: 0,
+                transform: "rotate(-6deg)",
+              }}
+              aria-hidden
+            >
+              <AlertTriangle size={18} strokeWidth={2.4} />
+            </span>
+            <p
+              style={{
+                position: "relative",
+                zIndex: 1,
+                fontSize: 12,
+                fontWeight: 600,
+                color: "#0F172A",
+                lineHeight: 1.5,
+              }}
+            >
+              <strong style={{ color: "#92400E" }}>
+                {stats.total - stats.withAny}
+              </strong>{" "}
+              child
+              {stats.total - stats.withAny === 1 ? "" : "ren"} have no parent
+              contact on file. Ask principal to update their PreStudents record
+              for emergency access.
+            </p>
+          </div>
         )}
 
         {/* Search */}
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input
+        <div
+          style={{
+            position: "relative",
+            borderRadius: 22,
+            background: "#fff",
+            boxShadow: PILLOW,
+            padding: "4px 4px 4px 14px",
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+          }}
+        >
+          <Search size={16} color="#94A3B8" strokeWidth={2.4} />
+          <input
             placeholder="Search by child or parent name…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="pl-9"
+            style={{
+              flex: 1,
+              background: "transparent",
+              border: "none",
+              outline: "none",
+              fontSize: 14,
+              fontWeight: 600,
+              color: "#0F172A",
+              padding: "12px 8px",
+              minWidth: 0,
+            }}
           />
+          {search && (
+            <button
+              type="button"
+              onClick={() => setSearch("")}
+              style={{
+                width: 32,
+                height: 32,
+                borderRadius: 999,
+                background: "#F1F5F9",
+                border: "none",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                cursor: "pointer",
+                flexShrink: 0,
+                marginRight: 4,
+              }}
+            >
+              <X size={14} color="#64748B" strokeWidth={2.4} />
+            </button>
+          )}
         </div>
 
         {/* List */}
         {filtered.length === 0 ? (
-          <Card>
-            <CardContent className="p-8 text-center text-sm text-muted-foreground">
-              No parents match.
-            </CardContent>
-          </Card>
+          <EmptyState
+            emoji={roster.length === 0 ? "🌱" : "🔍"}
+            title={roster.length === 0 ? "No children on roster" : "No matches"}
+            subtitle={
+              roster.length === 0
+                ? "Ask principal to add students."
+                : `Nothing matches "${search}".`
+            }
+          />
         ) : (
           <ul
-            className={cn(
-              isDesktop ? "grid grid-cols-2 xl:grid-cols-3 gap-3" : "space-y-2"
-            )}
+            style={{
+              display: "grid",
+              gridTemplateColumns: listCols,
+              gap: 12,
+              padding: 0,
+              margin: 0,
+              listStyle: "none",
+            }}
           >
             {filtered.map((child) => (
-              <ParentRow
-                key={child.id}
-                child={child}
-                onOpen={() => setOpenChild(child)}
-              />
+              <li key={child.id}>
+                <ParentRow child={child} onOpen={() => setOpenChild(child)} />
+              </li>
             ))}
           </ul>
         )}
 
-        <p className="text-[10px] text-center text-muted-foreground pt-2 leading-relaxed">
+        <p
+          style={{
+            fontSize: 10,
+            textAlign: "center",
+            color: "#94A3B8",
+            fontWeight: 600,
+            lineHeight: 1.55,
+            paddingTop: 8,
+          }}
+        >
           🔒 Privacy — contacts visible only to teachers assigned to this class.
           Use professionally; not a chat surface.
         </p>
       </div>
 
-      {/* Contact actions sheet */}
       {openChild && (
-        <ContactSheet child={openChild} onClose={() => setOpenChild(null)} />
+        <ContactSheet
+          child={openChild}
+          onClose={() => setOpenChild(null)}
+          isDesktop={isDesktop}
+        />
       )}
     </>
   );
 }
 
-function Stat({
+/* ═══════════════════════ building blocks ═══════════════════════ */
+
+function CounterCard({
   label,
   value,
   total,
+  emoji,
+  tone,
+  surface,
 }: {
   label: string;
   value: number;
   total: number;
+  emoji: string;
+  tone: string;
+  surface: string;
 }) {
   return (
-    <div>
-      <p className="text-2xl font-black leading-none">
-        {value}
-        <span className="text-base text-white/60">/{total}</span>
-      </p>
-      <p className="text-[10px] uppercase tracking-widest font-bold text-white/70 mt-1">
+    <div
+      style={{
+        position: "relative",
+        overflow: "hidden",
+        borderRadius: 22,
+        padding: "12px 12px 10px",
+        background: surface,
+        boxShadow: PILLOW,
+      }}
+    >
+      <DotScribbles color={tone} />
+      <div
+        style={{
+          display: "flex",
+          alignItems: "baseline",
+          justifyContent: "space-between",
+          position: "relative",
+          zIndex: 1,
+          gap: 4,
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "baseline", gap: 2 }}>
+          <span
+            style={{
+              fontSize: 28,
+              fontWeight: 900,
+              letterSpacing: "-1px",
+              color: tone,
+              lineHeight: 1,
+            }}
+          >
+            {value}
+          </span>
+          <span
+            style={{
+              fontSize: 12,
+              fontWeight: 700,
+              color: tone,
+              opacity: 0.55,
+            }}
+          >
+            /{total}
+          </span>
+        </div>
+        <span
+          style={{
+            fontSize: 20,
+            lineHeight: 1,
+            transform: "rotate(8deg)",
+            filter: "drop-shadow(0 3px 6px rgba(0,0,0,0.08))",
+          }}
+          aria-hidden
+        >
+          {emoji}
+        </span>
+      </div>
+      <p
+        style={{
+          fontSize: 10,
+          fontWeight: 800,
+          letterSpacing: "0.12em",
+          textTransform: "uppercase",
+          color: tone,
+          opacity: 0.75,
+          marginTop: 6,
+          position: "relative",
+          zIndex: 1,
+        }}
+      >
         {label}
       </p>
+    </div>
+  );
+}
+
+function EmptyState({
+  emoji,
+  title,
+  subtitle,
+}: {
+  emoji: string;
+  title: string;
+  subtitle: string;
+}) {
+  return (
+    <div
+      style={{
+        textAlign: "center",
+        padding: "32px 16px",
+        borderRadius: 22,
+        background: "#fff",
+        boxShadow: PILLOW,
+      }}
+    >
+      <p style={{ fontSize: 32, marginBottom: 8 }} aria-hidden>
+        {emoji}
+      </p>
+      <p style={{ fontSize: 14, fontWeight: 800, color: NAVY }}>{title}</p>
+      <p style={{ fontSize: 12, color: "#64748B", marginTop: 4 }}>{subtitle}</p>
     </div>
   );
 }
@@ -227,221 +532,460 @@ function ParentRow({
   const phone = cleanPhone(child.parentPhone);
   const wa = phone ? `https://wa.me/${phone.replace("+", "")}` : null;
 
-  return (
-    <li>
-      <Card
-        className={cn(
-          "border-2 transition",
-          hasContact ? "border-border" : "border-dashed border-edu-yellow/40"
-        )}
-      >
-        <CardContent className="p-3">
-          <button
-            type="button"
-            onClick={onOpen}
-            className="w-full flex items-center gap-3 text-left"
-          >
-            {child.photoURL ? (
-              <img
-                src={child.photoURL}
-                alt={child.name}
-                className="w-12 h-12 rounded-xl object-cover"
-              />
-            ) : (
-              <div className="w-12 h-12 rounded-xl bg-edu-navy text-white flex items-center justify-center font-black text-sm">
-                {child.name
-                  .split(/\s+/)
-                  .map((s) => s[0])
-                  .slice(0, 2)
-                  .join("")
-                  .toUpperCase()}
-              </div>
-            )}
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-bold text-edu-navy truncate">
-                {child.name}
-              </p>
-              <p className="text-[11px] text-muted-foreground truncate">
-                {child.parentName || "Parent"}
-                {child.parentPhone ? ` · ${child.parentPhone}` : ""}
-              </p>
-            </div>
-          </button>
-
-          {hasContact && (
-            <div className="flex items-center gap-1.5 mt-2 pt-2 border-t border-border">
-              {wa && (
-                <a
-                  href={wa}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex-1 h-9 rounded-lg bg-edu-light-green text-edu-green font-bold text-xs flex items-center justify-center gap-1 hover:bg-edu-light-green/70 active:scale-95 transition"
-                >
-                  <MessageCircle className="w-3.5 h-3.5" />
-                  WhatsApp
-                </a>
-              )}
-              {child.parentPhone && (
-                <a
-                  href={`tel:${cleanPhone(child.parentPhone)}`}
-                  className="flex-1 h-9 rounded-lg bg-edu-light-blue text-edu-blue font-bold text-xs flex items-center justify-center gap-1 hover:bg-edu-light-blue/70 active:scale-95 transition"
-                >
-                  <Phone className="w-3.5 h-3.5" />
-                  Call
-                </a>
-              )}
-              {child.parentEmail && !child.parentPhone && (
-                <a
-                  href={`mailto:${child.parentEmail}`}
-                  className="flex-1 h-9 rounded-lg bg-secondary text-edu-navy font-bold text-xs flex items-center justify-center gap-1 hover:bg-secondary/70 active:scale-95 transition"
-                >
-                  <Mail className="w-3.5 h-3.5" />
-                  Email
-                </a>
-              )}
-            </div>
-          )}
-
-          {!hasContact && (
-            <p className="text-[10px] text-edu-yellow font-bold mt-2 pt-2 border-t border-border italic flex items-center gap-1">
-              <AlertTriangle className="w-3 h-3" />
-              No contact on file
-            </p>
-          )}
-        </CardContent>
-      </Card>
-    </li>
-  );
-}
-
-function ContactSheet({
-  child,
-  onClose,
-}: {
-  child: RosterChild;
-  onClose: () => void;
-}) {
-  const phone = cleanPhone(child.parentPhone);
-  const wa = phone ? `https://wa.me/${phone.replace("+", "")}` : null;
-  const initials = child.name
-    .split(/\s+/)
-    .map((s) => s[0])
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
+  const surface = hasContact
+    ? "linear-gradient(135deg, #ECF3FF 0%, #FAFCFF 100%)"
+    : "linear-gradient(135deg, #FFEBC8 0%, #FFF7E5 100%)";
+  const scribble = hasContact ? SKY : BUTTER;
+  const ring = hasContact ? SKY : BUTTER;
 
   return (
     <div
-      className="fixed inset-0 z-[60] bg-black/50 backdrop-blur-sm flex items-end lg:items-center justify-center animate-fade-in"
-      onClick={onClose}
+      style={{
+        position: "relative",
+        overflow: "hidden",
+        borderRadius: 22,
+        background: surface,
+        boxShadow: PILLOW,
+        padding: 14,
+        display: "flex",
+        flexDirection: "column",
+        gap: 10,
+      }}
     >
-      <div
-        className="bg-white shadow-2xl w-full max-w-md max-h-[92vh] overflow-y-auto rounded-t-3xl lg:rounded-2xl lg:max-w-lg animate-slide-up lg:animate-fade-in"
-        onClick={(e) => e.stopPropagation()}
-        style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+      <DotScribbles color={scribble} />
+
+      <button
+        type="button"
+        onClick={onOpen}
+        style={{
+          position: "relative",
+          zIndex: 1,
+          display: "flex",
+          alignItems: "center",
+          gap: 12,
+          background: "transparent",
+          border: "none",
+          padding: 0,
+          textAlign: "left",
+          cursor: "pointer",
+        }}
+        className="active:scale-[0.99] transition"
       >
-        <div className="lg:hidden w-12 h-1.5 bg-border rounded-full mx-auto mt-2.5 mb-1" />
-
-        {/* Header */}
-        <div className="px-5 pt-3 pb-2 flex items-start justify-between">
-          <div className="flex items-center gap-3 min-w-0">
-            {child.photoURL ? (
-              <img
-                src={child.photoURL}
-                alt={child.name}
-                className="w-14 h-14 rounded-2xl object-cover"
-              />
-            ) : (
-              <div className="w-14 h-14 rounded-2xl bg-edu-navy text-white flex items-center justify-center font-black text-lg">
-                {initials}
-              </div>
-            )}
-            <div className="min-w-0">
-              <p className="text-base font-black text-edu-navy truncate">
-                {child.name}
-              </p>
-              <p className="text-[11px] text-muted-foreground truncate">
-                Roll {child.rollNo}
-              </p>
-              {child.parentName && (
-                <p className="text-xs font-bold text-edu-blue mt-0.5 truncate">
-                  Parent: {child.parentName}
-                </p>
-              )}
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="w-9 h-9 rounded-full hover:bg-secondary flex items-center justify-center"
+        <CartoonAvatar
+          name={child.name}
+          size={48}
+          ringColor={ring}
+          ringWidth={3}
+        />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <p
+            style={{
+              fontSize: 14,
+              fontWeight: 800,
+              color: NAVY,
+              letterSpacing: "-0.2px",
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+            }}
           >
-            <X className="w-4 h-4" />
-          </button>
+            {child.name}
+          </p>
+          <p
+            style={{
+              fontSize: 11,
+              fontWeight: 600,
+              color: "#64748B",
+              marginTop: 2,
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+            }}
+          >
+            {child.parentName || "Parent"}
+            {child.parentPhone ? ` · ${child.parentPhone}` : ""}
+          </p>
         </div>
+      </button>
 
-        <div className="px-5 mt-4 space-y-3 pb-5">
+      {hasContact ? (
+        <div
+          style={{
+            position: "relative",
+            zIndex: 1,
+            display: "flex",
+            gap: 6,
+            paddingTop: 8,
+            borderTop: "1px dashed rgba(15,23,42,0.12)",
+          }}
+        >
           {wa && (
             <a
               href={wa}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center gap-3 p-3 rounded-xl bg-edu-light-green border border-edu-green/30 hover:bg-edu-light-green/70 active:scale-[0.98] transition"
+              style={{
+                flex: 1,
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 5,
+                padding: "9px 10px",
+                borderRadius: 14,
+                background: `linear-gradient(135deg, #25D366, #128C7E)`,
+                color: "#fff",
+                fontSize: 11,
+                fontWeight: 800,
+                textDecoration: "none",
+                boxShadow: `0 6px 14px rgba(37,211,102,0.45)`,
+              }}
+              className="active:scale-95 hover:-translate-y-0.5 transition"
             >
-              <div className="w-10 h-10 rounded-xl bg-edu-green text-white flex items-center justify-center">
-                <MessageCircle className="w-5 h-5" />
-              </div>
-              <div className="flex-1">
-                <p className="text-sm font-bold text-edu-navy">WhatsApp</p>
-                <p className="text-[11px] text-muted-foreground">{phone}</p>
-              </div>
+              <MessageCircle size={12} strokeWidth={2.6} />
+              WhatsApp
             </a>
           )}
           {child.parentPhone && (
             <a
-              href={`tel:${phone}`}
-              className="flex items-center gap-3 p-3 rounded-xl bg-edu-light-blue border border-edu-blue/30 hover:bg-edu-light-blue/70 active:scale-[0.98] transition"
+              href={`tel:${cleanPhone(child.parentPhone)}`}
+              style={{
+                flex: 1,
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 5,
+                padding: "9px 10px",
+                borderRadius: 14,
+                background: `linear-gradient(135deg, ${SKY}, #0284C7)`,
+                color: "#fff",
+                fontSize: 11,
+                fontWeight: 800,
+                textDecoration: "none",
+                boxShadow: `0 6px 14px ${SKY}55`,
+              }}
+              className="active:scale-95 hover:-translate-y-0.5 transition"
             >
-              <div className="w-10 h-10 rounded-xl bg-edu-blue text-white flex items-center justify-center">
-                <Phone className="w-5 h-5" />
-              </div>
-              <div className="flex-1">
-                <p className="text-sm font-bold text-edu-navy">Call</p>
-                <p className="text-[11px] text-muted-foreground">
-                  {child.parentPhone}
-                </p>
-              </div>
+              <Phone size={12} strokeWidth={2.6} />
+              Call
             </a>
           )}
-          {child.parentEmail && (
+          {child.parentEmail && !child.parentPhone && (
             <a
               href={`mailto:${child.parentEmail}`}
-              className="flex items-center gap-3 p-3 rounded-xl bg-secondary border border-border hover:bg-secondary/70 active:scale-[0.98] transition"
+              style={{
+                flex: 1,
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 5,
+                padding: "9px 10px",
+                borderRadius: 14,
+                background: "#fff",
+                color: NAVY,
+                fontSize: 11,
+                fontWeight: 800,
+                textDecoration: "none",
+                boxShadow: "inset 0 0 0 1px #CBD5E1",
+              }}
+              className="active:scale-95 hover:-translate-y-0.5 transition"
             >
-              <div className="w-10 h-10 rounded-xl bg-edu-navy text-white flex items-center justify-center">
-                <Mail className="w-5 h-5" />
-              </div>
-              <div className="flex-1">
-                <p className="text-sm font-bold text-edu-navy">Email</p>
-                <p className="text-[11px] text-muted-foreground truncate">
-                  {child.parentEmail}
+              <Mail size={12} strokeWidth={2.6} />
+              Email
+            </a>
+          )}
+        </div>
+      ) : (
+        <div
+          style={{
+            position: "relative",
+            zIndex: 1,
+            paddingTop: 8,
+            borderTop: "1px dashed rgba(15,23,42,0.12)",
+            fontSize: 11,
+            fontWeight: 700,
+            fontStyle: "italic",
+            color: "#92400E",
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 5,
+          }}
+        >
+          <AlertTriangle size={11} strokeWidth={2.6} />
+          No contact on file
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ═══════════════════════ Contact sheet ═══════════════════════ */
+
+function ContactSheet({
+  child,
+  onClose,
+  isDesktop,
+}: {
+  child: RosterChild;
+  onClose: () => void;
+  isDesktop: boolean;
+}) {
+  const phone = cleanPhone(child.parentPhone);
+  const wa = phone ? `https://wa.me/${phone.replace("+", "")}` : null;
+
+  return (
+    <div
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 60,
+        background: "rgba(15,23,42,0.5)",
+        backdropFilter: "blur(4px)",
+        WebkitBackdropFilter: "blur(4px)",
+        display: "flex",
+        alignItems: isDesktop ? "center" : "flex-end",
+        justifyContent: "center",
+        animation: "fade-in 200ms ease-out",
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          width: "100%",
+          maxWidth: isDesktop ? 520 : 480,
+          maxHeight: isDesktop ? "88vh" : "92vh",
+          overflowY: "auto",
+          background:
+            "linear-gradient(180deg, #F0F9FF 0%, #FFFFFF 28%, #FFFFFF 100%)",
+          borderRadius: isDesktop ? 28 : "28px 28px 0 0",
+          boxShadow: "0 -20px 60px rgba(15,23,42,0.18)",
+          animation: "slide-up 240ms cubic-bezier(.34,1.56,.64,1)",
+          position: "relative",
+          margin: isDesktop ? "0 16px" : 0,
+          paddingBottom: "env(safe-area-inset-bottom)",
+        }}
+      >
+        {/* Sticky header */}
+        <div
+          style={{
+            position: "sticky",
+            top: 0,
+            background:
+              "linear-gradient(180deg, rgba(240,249,255,0.95) 0%, rgba(255,255,255,0.85) 100%)",
+            backdropFilter: "blur(10px)",
+            WebkitBackdropFilter: "blur(10px)",
+            padding: isDesktop ? "16px 22px 14px" : "10px 18px 12px",
+            borderRadius: isDesktop ? "28px 28px 0 0" : "28px 28px 0 0",
+            zIndex: 10,
+          }}
+        >
+          {!isDesktop && (
+            <div
+              style={{
+                width: 48,
+                height: 5,
+                borderRadius: 999,
+                background: "#E2E8F0",
+                margin: "0 auto 12px",
+              }}
+            />
+          )}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 12,
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 12,
+                flex: 1,
+                minWidth: 0,
+              }}
+            >
+              <CartoonAvatar
+                name={child.name}
+                size={52}
+                ringColor={SKY}
+                ringWidth={3}
+              />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <h2
+                  style={{
+                    fontSize: 17,
+                    fontWeight: 800,
+                    letterSpacing: "-0.3px",
+                    color: NAVY,
+                    whiteSpace: "nowrap",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                  }}
+                >
+                  {child.name}{" "}
+                  <span
+                    aria-hidden
+                    style={{
+                      display: "inline-block",
+                      transform: "rotate(-6deg)",
+                      fontSize: 15,
+                    }}
+                  >
+                    💌
+                  </span>
+                </h2>
+                <p
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 600,
+                    color: "#64748B",
+                    marginTop: 2,
+                  }}
+                >
+                  Roll #{child.rollNo}
+                  {child.parentName && (
+                    <>
+                      {" · "}
+                      <span style={{ fontWeight: 800, color: SKY }}>
+                        {child.parentName}
+                      </span>
+                    </>
+                  )}
                 </p>
               </div>
-            </a>
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close"
+              style={{
+                width: 34,
+                height: 34,
+                borderRadius: 999,
+                background: "#F1F5F9",
+                border: "none",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                cursor: "pointer",
+                flexShrink: 0,
+              }}
+            >
+              <X size={16} color="#64748B" strokeWidth={2.4} />
+            </button>
+          </div>
+        </div>
+
+        {/* Body */}
+        <div
+          style={{
+            padding: isDesktop ? "16px 22px 24px" : "12px 18px 24px",
+            display: "flex",
+            flexDirection: "column",
+            gap: 12,
+          }}
+        >
+          {wa && (
+            <ContactAction
+              href={wa}
+              target="_blank"
+              tone="#25D366"
+              gradient="linear-gradient(135deg, #25D366, #128C7E)"
+              surface="linear-gradient(135deg, #DCF8E0 0%, #F1FBF1 100%)"
+              icon={<MessageCircle size={20} strokeWidth={2.4} color="#fff" />}
+              label="WhatsApp"
+              value={phone}
+            />
+          )}
+          {child.parentPhone && (
+            <ContactAction
+              href={`tel:${phone}`}
+              tone={SKY}
+              gradient={`linear-gradient(135deg, ${SKY}, #0284C7)`}
+              surface="linear-gradient(135deg, #DCEEFF 0%, #F5FAFF 100%)"
+              icon={<Phone size={20} strokeWidth={2.4} color="#fff" />}
+              label="Call"
+              value={child.parentPhone}
+            />
+          )}
+          {child.parentEmail && (
+            <ContactAction
+              href={`mailto:${child.parentEmail}`}
+              tone={LAV}
+              gradient={`linear-gradient(135deg, ${LAV}, #7C3AED)`}
+              surface="linear-gradient(135deg, #EDE2FF 0%, #F8F3FF 100%)"
+              icon={<Mail size={20} strokeWidth={2.4} color="#fff" />}
+              label="Email"
+              value={child.parentEmail}
+            />
           )}
 
           {!child.parentPhone && !child.parentEmail && (
-            <Card className="bg-edu-light-yellow/40 border-edu-yellow/40">
-              <CardContent className="p-3 text-xs text-foreground/80 flex items-start gap-2">
-                <AlertTriangle className="w-4 h-4 text-edu-yellow shrink-0 mt-0.5" />
-                <p>
-                  No parent contact on file. Ask principal to update{" "}
-                  {child.name.split(" ")[0]}'s record in PreStudents.
-                </p>
-              </CardContent>
-            </Card>
+            <div
+              style={{
+                position: "relative",
+                overflow: "hidden",
+                borderRadius: 18,
+                padding: 14,
+                background: "linear-gradient(135deg, #FFEBC8 0%, #FFF7E5 100%)",
+                boxShadow: PILLOW,
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+              }}
+            >
+              <DotScribbles color={BUTTER} />
+              <span
+                style={{
+                  position: "relative",
+                  zIndex: 1,
+                  width: 36,
+                  height: 36,
+                  borderRadius: 12,
+                  background: `linear-gradient(135deg, ${BUTTER}, ${PEACH})`,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  color: "#fff",
+                  boxShadow: `0 6px 14px ${BUTTER}55`,
+                  transform: "rotate(-6deg)",
+                  flexShrink: 0,
+                }}
+                aria-hidden
+              >
+                <AlertTriangle size={18} strokeWidth={2.4} />
+              </span>
+              <p
+                style={{
+                  position: "relative",
+                  zIndex: 1,
+                  fontSize: 12,
+                  fontWeight: 600,
+                  color: "#0F172A",
+                  lineHeight: 1.5,
+                }}
+              >
+                No parent contact on file. Ask principal to update{" "}
+                {child.name.split(" ")[0]}'s record in PreStudents.
+              </p>
+            </div>
           )}
 
-          <p className="text-[10px] text-center text-muted-foreground pt-3 leading-relaxed">
+          <p
+            style={{
+              fontSize: 10,
+              textAlign: "center",
+              color: "#94A3B8",
+              fontWeight: 600,
+              lineHeight: 1.55,
+              paddingTop: 10,
+            }}
+          >
             🔒 Use for emergencies, picnic announcements, or sub-teacher days.
             Not for personal/casual chat.
           </p>
@@ -450,3 +994,129 @@ function ContactSheet({
     </div>
   );
 }
+
+function ContactAction({
+  href,
+  target,
+  tone,
+  gradient,
+  surface,
+  icon,
+  label,
+  value,
+}: {
+  href: string;
+  target?: string;
+  tone: string;
+  gradient: string;
+  surface: string;
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+}) {
+  return (
+    <a
+      href={href}
+      target={target}
+      rel={target === "_blank" ? "noopener noreferrer" : undefined}
+      style={{
+        position: "relative",
+        overflow: "hidden",
+        display: "flex",
+        alignItems: "center",
+        gap: 12,
+        padding: 14,
+        borderRadius: 18,
+        background: surface,
+        boxShadow: PILLOW,
+        textDecoration: "none",
+      }}
+      className="active:scale-[0.98] hover:-translate-y-0.5 transition"
+    >
+      <DotScribbles color={tone} />
+      <span
+        style={{
+          position: "relative",
+          zIndex: 1,
+          width: 44,
+          height: 44,
+          borderRadius: 14,
+          background: gradient,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          boxShadow: `0 8px 18px -4px ${tone}66`,
+          transform: "rotate(-6deg)",
+          flexShrink: 0,
+        }}
+        aria-hidden
+      >
+        {icon}
+      </span>
+      <div style={{ position: "relative", zIndex: 1, flex: 1, minWidth: 0 }}>
+        <p
+          style={{
+            fontSize: 14,
+            fontWeight: 800,
+            color: NAVY,
+            letterSpacing: "-0.2px",
+          }}
+        >
+          {label}
+        </p>
+        <p
+          style={{
+            fontSize: 11,
+            fontWeight: 600,
+            color: "#64748B",
+            marginTop: 2,
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+          }}
+        >
+          {value}
+        </p>
+      </div>
+    </a>
+  );
+}
+
+function DotScribbles({
+  color,
+  dense = false,
+}: {
+  color: string;
+  dense?: boolean;
+}) {
+  return (
+    <svg
+      aria-hidden="true"
+      width="100%"
+      height="100%"
+      style={{
+        position: "absolute",
+        inset: 0,
+        opacity: dense ? 0.1 : 0.07,
+        pointerEvents: "none",
+      }}
+    >
+      <circle cx="14%" cy="24%" r="2.5" fill={color} />
+      <circle cx="82%" cy="14%" r="1.8" fill={color} />
+      <circle cx="68%" cy="62%" r="2" fill={color} />
+      <circle cx="22%" cy="80%" r="1.6" fill={color} />
+      <circle cx="48%" cy="32%" r="1.4" fill={color} />
+      {dense && (
+        <>
+          <circle cx="90%" cy="80%" r="2.2" fill={color} />
+          <circle cx="6%" cy="60%" r="1.4" fill={color} />
+          <circle cx="55%" cy="88%" r="1.6" fill={color} />
+        </>
+      )}
+    </svg>
+  );
+}
+
+// Palette constants reserved for future variants on this page.
+void BLUSH;
+void RED;
