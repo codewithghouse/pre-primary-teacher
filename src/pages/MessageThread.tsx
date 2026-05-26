@@ -239,6 +239,16 @@ export function MessageThreadInner({ role }: MessageThreadInnerProps) {
       ? "Reply to parent · text only · keep it kind"
       : "Reply to teacher · text only · keep it kind";
 
+  const COL_MAX = 820;
+  const headerInner: React.CSSProperties = {
+    width: "100%",
+    maxWidth: COL_MAX,
+    margin: "0 auto",
+    display: "flex",
+    alignItems: "center",
+    gap: 12,
+  };
+
   return (
     <div
       style={{
@@ -258,13 +268,11 @@ export function MessageThreadInner({ role }: MessageThreadInnerProps) {
           background: "rgba(255,255,255,0.92)",
           backdropFilter: "blur(10px)",
           WebkitBackdropFilter: "blur(10px)",
-          padding: isDesktop ? "16px 24px" : "12px 16px",
+          padding: isDesktop ? "14px 24px" : "12px 16px",
           borderBottom: "1px solid rgba(15,23,42,0.06)",
-          display: "flex",
-          alignItems: "center",
-          gap: 12,
         }}
       >
+      <div style={headerInner}>
         <button
           type="button"
           onClick={() => navigate("/messages")}
@@ -345,23 +353,39 @@ export function MessageThreadInner({ role }: MessageThreadInnerProps) {
           )}
         </button>
       </div>
+      </div>
 
       {/* Trust strip */}
       <div
         style={{
           padding: isDesktop ? "10px 24px" : "8px 16px",
-          fontSize: 10,
-          fontWeight: 600,
-          color: "#64748B",
-          display: "flex",
-          alignItems: "center",
-          gap: 6,
-          flexWrap: "wrap",
         }}
       >
-        <Shield size={11} color={SKY} strokeWidth={2.6} />
-        Be kind. Messages are visible to principal if reported. Append-only
-        audit log.
+        <div
+          style={{
+            width: "100%",
+            maxWidth: COL_MAX,
+            margin: "0 auto",
+            padding: "8px 12px",
+            borderRadius: 12,
+            background: `linear-gradient(135deg, ${SKY}14 0%, ${SKY}06 100%)`,
+            boxShadow: `inset 0 0 0 1px ${SKY}22`,
+            fontSize: 11,
+            fontWeight: 600,
+            color: "#475569",
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            flexWrap: "wrap",
+            lineHeight: 1.4,
+          }}
+        >
+          <Shield size={13} color={SKY} strokeWidth={2.6} />
+          <span>
+            Be kind. Messages are visible to principal if reported. Append-only
+            audit log.
+          </span>
+        </div>
       </div>
 
       {/* Message list */}
@@ -371,11 +395,19 @@ export function MessageThreadInner({ role }: MessageThreadInnerProps) {
           overflowY: "auto",
           padding: isDesktop ? "12px 24px 20px" : "8px 14px 20px",
           display: "flex",
-          flexDirection: "column",
-          gap: 4,
+          justifyContent: "center",
         }}
         onClick={() => setOpenMenu(null)}
       >
+        <div
+          style={{
+            width: "100%",
+            maxWidth: COL_MAX,
+            display: "flex",
+            flexDirection: "column",
+            gap: 4,
+          }}
+        >
         {messages.length === 0 ? (
           <EmptyChat
             otherName={
@@ -429,6 +461,7 @@ export function MessageThreadInner({ role }: MessageThreadInnerProps) {
           ))
         )}
         <div ref={bottomRef} aria-hidden />
+        </div>
       </div>
 
       {/* Composer */}
@@ -442,6 +475,7 @@ export function MessageThreadInner({ role }: MessageThreadInnerProps) {
           borderTop: "1px solid rgba(15,23,42,0.06)",
         }}
       >
+        <div style={{ width: "100%", maxWidth: COL_MAX, margin: "0 auto" }}>
         <p
           style={{
             fontSize: 10,
@@ -537,6 +571,7 @@ export function MessageThreadInner({ role }: MessageThreadInnerProps) {
               <Send size={16} strokeWidth={2.6} />
             )}
           </button>
+        </div>
         </div>
       </div>
 

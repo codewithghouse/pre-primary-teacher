@@ -99,10 +99,32 @@ export default {
           from: { transform: "translateY(100%)" },
           to: { transform: "translateY(0)" },
         },
+        "mood-bob": {
+          "0%, 100%": { transform: "translateY(0) rotate(0deg)" },
+          "50%": { transform: "translateY(-3px) rotate(-2deg)" },
+        },
+        "mood-pop": {
+          "0%": { transform: "scale(0.6) rotate(-12deg)" },
+          "55%": { transform: "scale(1.25) rotate(8deg)" },
+          "100%": { transform: "scale(1) rotate(0deg)" },
+        },
+        "mood-wiggle": {
+          "0%, 100%": { transform: "rotate(0deg) scale(1)" },
+          "25%": { transform: "rotate(-8deg) scale(1.08)" },
+          "75%": { transform: "rotate(8deg) scale(1.08)" },
+        },
+        "mood-glow": {
+          "0%, 100%": { boxShadow: "0 6px 16px var(--mood-glow, rgba(0,0,0,0.2))" },
+          "50%": { boxShadow: "0 10px 28px var(--mood-glow, rgba(0,0,0,0.35))" },
+        },
       },
       animation: {
         "fade-in": "fade-in 0.2s ease-out",
         "slide-up": "slide-up 0.3s ease-out",
+        "mood-bob": "mood-bob 2.4s ease-in-out infinite",
+        "mood-pop": "mood-pop 420ms cubic-bezier(.34,1.56,.64,1)",
+        "mood-wiggle": "mood-wiggle 600ms ease-in-out",
+        "mood-glow": "mood-glow 2s ease-in-out infinite",
       },
     },
   },

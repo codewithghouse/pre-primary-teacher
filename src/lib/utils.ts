@@ -23,7 +23,7 @@ export function moodEmoji(mood?: string): string {
     case "ok":
       return "😐";
     case "crying":
-      return "😢";
+      return "😭";
     case "sleepy":
       return "😴";
     case "unwell":
