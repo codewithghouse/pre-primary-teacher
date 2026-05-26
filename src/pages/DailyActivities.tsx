@@ -621,6 +621,7 @@ export default function DailyActivities() {
           draftNote={draftNote}
           setDraftNote={setDraftNote}
           saving={saving}
+          isDesktop={isDesktop}
           onClose={() => !saving && setEditingSlotId(null)}
           onSave={saveSlot}
           onSkip={(reason) => {
@@ -961,6 +962,7 @@ function EditSheet({
   draftNote,
   setDraftNote,
   saving,
+  isDesktop,
   onClose,
   onSave,
   onSkip,
@@ -969,6 +971,7 @@ function EditSheet({
   draftNote: string;
   setDraftNote: (v: string) => void;
   saving: boolean;
+  isDesktop: boolean;
   onClose: () => void;
   onSave: () => void;
   onSkip: (reason: string) => void;
@@ -984,8 +987,9 @@ function EditSheet({
         backdropFilter: "blur(4px)",
         WebkitBackdropFilter: "blur(4px)",
         display: "flex",
-        alignItems: "flex-end",
+        alignItems: isDesktop ? "center" : "flex-end",
         justifyContent: "center",
+        padding: isDesktop ? "24px" : 0,
         animation: "fade-in 200ms ease-out",
       }}
     >
@@ -994,15 +998,19 @@ function EditSheet({
         style={{
           width: "100%",
           maxWidth: 480,
-          maxHeight: "92vh",
+          maxHeight: isDesktop ? "min(92vh, 720px)" : "92vh",
           overflowY: "auto",
           background:
             "linear-gradient(180deg, #F0F9FF 0%, #FFFFFF 28%, #FFFFFF 100%)",
-          borderRadius: "28px 28px 0 0",
-          boxShadow: "0 -20px 60px rgba(15,23,42,0.18)",
-          animation: "slide-up 240ms cubic-bezier(.34,1.56,.64,1)",
+          borderRadius: isDesktop ? 28 : "28px 28px 0 0",
+          boxShadow: isDesktop
+            ? "0 24px 60px rgba(15,23,42,0.22), 0 8px 20px rgba(15,23,42,0.10)"
+            : "0 -20px 60px rgba(15,23,42,0.18)",
+          animation: isDesktop
+            ? "fade-in 220ms ease-out"
+            : "slide-up 240ms cubic-bezier(.34,1.56,.64,1)",
           position: "relative",
-          paddingBottom: "env(safe-area-inset-bottom)",
+          paddingBottom: isDesktop ? 0 : "env(safe-area-inset-bottom)",
         }}
       >
         {/* Sticky header */}
@@ -1014,20 +1022,22 @@ function EditSheet({
               "linear-gradient(180deg, rgba(240,249,255,0.95) 0%, rgba(255,255,255,0.85) 100%)",
             backdropFilter: "blur(10px)",
             WebkitBackdropFilter: "blur(10px)",
-            padding: "10px 18px 12px",
-            borderRadius: "28px 28px 0 0",
+            padding: isDesktop ? "16px 18px 12px" : "10px 18px 12px",
+            borderRadius: isDesktop ? "28px 28px 0 0" : "28px 28px 0 0",
             zIndex: 10,
           }}
         >
-          <div
-            style={{
-              width: 48,
-              height: 5,
-              borderRadius: 999,
-              background: "#E2E8F0",
-              margin: "0 auto 12px",
-            }}
-          />
+          {!isDesktop && (
+            <div
+              style={{
+                width: 48,
+                height: 5,
+                borderRadius: 999,
+                background: "#E2E8F0",
+                margin: "0 auto 12px",
+              }}
+            />
+          )}
           <div
             style={{
               display: "flex",

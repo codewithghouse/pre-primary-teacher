@@ -11,6 +11,7 @@ import {
 import { useAuth } from "@/lib/AuthContext";
 import { useIsDesktop } from "@/hooks/useIsDesktop";
 import { CartoonAvatar } from "@/components/CartoonAvatar";
+import { Emoji } from "@/components/Emoji";
 import { subscribeSchoolHolidays, type SchoolHoliday } from "@/lib/schoolHolidays";
 import { todayISO } from "@/lib/dates";
 
@@ -34,10 +35,10 @@ const PILLOW =
 
 const MOODS = [
   { key: "happy", emoji: "😊", label: "Happy", tone: MINT },
-  { key: "ok", emoji: "😐", label: "OK", tone: SKY },
-  { key: "crying", emoji: "😢", label: "Crying", tone: BUTTER },
+  { key: "ok", emoji: "🙂", label: "OK", tone: SKY },
+  { key: "crying", emoji: "😭", label: "Crying", tone: BUTTER },
   { key: "sleepy", emoji: "😴", label: "Sleepy", tone: LAV },
-  { key: "unwell", emoji: "🤒", label: "Unwell", tone: RED },
+  { key: "unwell", emoji: "🤧", label: "Unwell", tone: RED },
 ] as const;
 
 export default function Attendance() {
@@ -759,7 +760,7 @@ export default function Attendance() {
                 zIndex: 1,
               }}
             >
-              {MOODS.map((m) => {
+              {MOODS.map((m, idx) => {
                 const selected = sheetMood === m.key;
                 return (
                   <button
@@ -767,6 +768,8 @@ export default function Attendance() {
                     onClick={() => pickMood(m.key as MoodKey)}
                     type="button"
                     style={{
+                      position: "relative",
+                      overflow: "visible",
                       aspectRatio: "1 / 1",
                       borderRadius: 18,
                       display: "flex",
@@ -779,15 +782,56 @@ export default function Attendance() {
                         : "#F1F5F9",
                       color: selected ? "#fff" : "#334155",
                       boxShadow: selected
-                        ? `0 6px 16px ${m.tone}55`
+                        ? `0 10px 24px -4px ${m.tone}66, 0 0 0 3px ${m.tone}33`
                         : "inset 0 0 0 1px #E2E8F0",
-                      transition: "transform 140ms ease",
+                      transform: selected ? "translateY(-3px)" : "none",
+                      transition:
+                        "transform 220ms cubic-bezier(.34,1.56,.64,1), box-shadow 220ms ease, background 200ms ease",
                       cursor: "pointer",
+                      ["--mood-glow" as any]: `${m.tone}66`,
                     }}
-                    className="active:scale-90 hover:-translate-y-0.5"
+                    className={`mood-btn active:scale-90 hover:-translate-y-1 ${
+                      selected ? "animate-mood-glow" : ""
+                    }`}
                   >
-                    <span style={{ fontSize: 26, lineHeight: 1 }}>{m.emoji}</span>
-                    <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.04em" }}>
+                    {selected && (
+                      <span
+                        aria-hidden
+                        style={{
+                          position: "absolute",
+                          inset: -4,
+                          borderRadius: 22,
+                          background: `radial-gradient(circle at 50% 0%, ${m.tone}55 0%, transparent 70%)`,
+                          opacity: 0.9,
+                          pointerEvents: "none",
+                          zIndex: 0,
+                        }}
+                      />
+                    )}
+                    <Emoji
+                      key={`${m.key}-${selected ? "on" : "off"}`}
+                      emoji={m.emoji}
+                      size={selected ? 34 : 28}
+                      className={selected ? "animate-mood-pop" : "animate-mood-bob"}
+                      style={{
+                        position: "relative",
+                        zIndex: 1,
+                        animationDelay: selected ? "0s" : `${idx * 180}ms`,
+                        filter: selected
+                          ? `drop-shadow(0 4px 10px ${m.tone}88)`
+                          : "drop-shadow(0 2px 4px rgba(15,23,42,0.12))",
+                        transition: "width 220ms ease, height 220ms ease",
+                      }}
+                    />
+                    <span
+                      style={{
+                        fontSize: 10,
+                        fontWeight: 800,
+                        letterSpacing: "0.04em",
+                        position: "relative",
+                        zIndex: 1,
+                      }}
+                    >
                       {m.label}
                     </span>
                   </button>
@@ -994,7 +1038,9 @@ function ChildCard({
   onMarkAbsent: () => void;
 }) {
   const handlers = useLongPress(onLongPress, onTap, 500);
-  const moodEmoji = MOODS.find((m) => m.key === mood)?.emoji;
+  const moodDef = MOODS.find((m) => m.key === mood);
+  const moodEmoji = moodDef?.emoji;
+  const moodTone = moodDef?.tone ?? NAVY;
   const isPresent =
     status === "present" || status === "late" || status === "half-day";
   const isAbsent = status === "absent";
@@ -1060,10 +1106,10 @@ function ChildCard({
           }}
           style={{
             position: "absolute",
-            top: 6,
-            left: 6,
-            width: 28,
-            height: 28,
+            top: isPresent ? 38 : 8,
+            right: 8,
+            width: 24,
+            height: 24,
             borderRadius: 999,
             background: "#fff",
             color: RED,
@@ -1074,13 +1120,13 @@ function ChildCard({
             cursor: busy ? "default" : "pointer",
             zIndex: 3,
             transform: "rotate(-6deg)",
-            transition: "transform 120ms ease",
+            transition: "transform 120ms ease, top 160ms ease",
             touchAction: "manipulation",
             WebkitTapHighlightColor: "transparent",
           }}
           title="Mark absent"
         >
-          <X size={15} strokeWidth={3} />
+          <X size={14} strokeWidth={3} />
         </span>
       )}
 
@@ -1159,17 +1205,31 @@ function ChildCard({
         <div
           style={{
             position: "absolute",
-            bottom: 38,
-            left: 8,
-            fontSize: 22,
-            transform: "rotate(-8deg)",
-            filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.10))",
+            top: 4,
+            left: 4,
+            width: 46,
+            height: 46,
+            borderRadius: 999,
+            background: `radial-gradient(circle at 50% 35%, ${moodTone}33 0%, ${moodTone}10 60%, transparent 100%)`,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
             pointerEvents: "none",
             zIndex: 2,
           }}
           aria-hidden
         >
-          {moodEmoji}
+          <Emoji
+            key={mood}
+            emoji={moodEmoji}
+            size={36}
+            style={{
+              transformOrigin: "center",
+              filter: `drop-shadow(0 3px 6px ${moodTone}66)`,
+              animation:
+                "mood-pop 420ms cubic-bezier(.34,1.56,.64,1) both, mood-bob 2.6s ease-in-out 420ms infinite",
+            }}
+          />
         </div>
       )}
 
