@@ -21,13 +21,13 @@ export function moodEmoji(mood?: string): string {
     case "happy":
       return "😊";
     case "ok":
-      return "😐";
+      return "🙂";
     case "crying":
       return "😭";
     case "sleepy":
       return "😴";
     case "unwell":
-      return "🤒";
+      return "🤧";
     default:
       return "❔";
   }

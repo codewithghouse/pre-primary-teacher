@@ -70,7 +70,7 @@ const MOOD_EMOJI: Record<MoodKey, string> = {
   ok: "🙂",
   sleepy: "😴",
   crying: "😭",
-  unwell: "🤒",
+  unwell: "🤧",
 };
 
 const MOOD_LABEL: Record<MoodKey, string> = {
