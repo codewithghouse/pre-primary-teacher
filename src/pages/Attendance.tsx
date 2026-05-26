@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Check, Loader2, Sparkles, AlertTriangle } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Check, Loader2, Sparkles, AlertTriangle, X, CalendarOff, PartyPopper } from "lucide-react";
 import { toast } from "sonner";
 import { useTeacherClass } from "@/hooks/useTeacherClass";
 import { useClassRoster, type RosterChild } from "@/hooks/useClassRoster";
@@ -11,6 +11,8 @@ import {
 import { useAuth } from "@/lib/AuthContext";
 import { useIsDesktop } from "@/hooks/useIsDesktop";
 import { CartoonAvatar } from "@/components/CartoonAvatar";
+import { subscribeSchoolHolidays, type SchoolHoliday } from "@/lib/schoolHolidays";
+import { todayISO } from "@/lib/dates";
 
 /* ═══════════════════════════════════════════════════════════════════════
    PRE-PRIMARY TEACHER · ATTENDANCE & MOOD
@@ -48,6 +50,39 @@ export default function Attendance() {
   const [moodSheetFor, setMoodSheetFor] = useState<string | null>(null);
   const [busyIds, setBusyIds] = useState<Set<string>>(new Set());
   const isDesktop = useIsDesktop();
+
+  // ── School-holiday subscription ───────────────────────────────────────
+  // Read principal-declared holidays + own previously-saved class holiday.
+  // When today is one, show a celebratory banner and short-circuit roll
+  // call. Mirrors the K-12 teacher dashboard pattern.
+  const [schoolHolidays, setSchoolHolidays] = useState<SchoolHoliday[]>([]);
+  useEffect(() => {
+    if (!teacherData?.schoolId) return;
+    const unsub = subscribeSchoolHolidays(
+      teacherData.schoolId,
+      setSchoolHolidays,
+      (err) => console.error("[pre-Attendance] school_holidays:", err),
+    );
+    return () => unsub();
+  }, [teacherData?.schoolId]);
+  const todayKey = todayISO();
+  const todaySchoolHoliday = useMemo(
+    () => schoolHolidays.find((h) => h.date === todayKey) || null,
+    [schoolHolidays, todayKey],
+  );
+  // If this class already has its day marked as holiday via the button
+  // below, treat the day as a class holiday even when the principal
+  // hasn't declared a school-wide one.
+  const classDayIsHoliday = useMemo(() => {
+    if (todaySchoolHoliday) return true;
+    const rec = roster.find((c) => records[c.id]?.status === "holiday");
+    return !!rec;
+  }, [todaySchoolHoliday, roster, records]);
+
+  // Holiday confirm modal + reason
+  const [holidayOpen, setHolidayOpen] = useState(false);
+  const [holidayReason, setHolidayReason] = useState("");
+  const [holidaySaving, setHolidaySaving] = useState(false);
 
   const loading = classLoading || rosterLoading || attLoading;
 
@@ -99,6 +134,51 @@ export default function Attendance() {
       toast.error("Could not save. Try again.");
     } finally {
       setBusy(child.id, false);
+    }
+  };
+
+  // ── Holiday flow — declares the whole day off for the class ────────────
+  // Writes one attendance doc per child with status:"holiday" + the
+  // reason note. All attendance % readers across the 4 dashboards
+  // short-circuit on this status, matching K-12 teacher behaviour.
+  const saveHoliday = async () => {
+    if (showGate) {
+      toast.error(
+        primaryClass?.classTeacherName
+          ? `Only ${primaryClass.classTeacherName} (class teacher) can mark a class holiday.`
+          : "Only the class teacher can mark a class holiday.",
+      );
+      return;
+    }
+    if (!roster.length) {
+      toast.error("No children in this class yet.");
+      return;
+    }
+    setHolidaySaving(true);
+    try {
+      const reason = holidayReason.trim() || todaySchoolHoliday?.reason || "School holiday";
+      await Promise.all(
+        roster.map((c) =>
+          writeAttendance(
+            {
+              studentId: c.id,
+              studentName: c.name,
+              studentEmail: c.email,
+              status: "holiday",
+              note: reason,
+            },
+            primaryClass?.name,
+          ),
+        ),
+      );
+      toast.success(`Day marked as holiday · ${roster.length} children excluded from attendance %`);
+      setHolidayOpen(false);
+      setHolidayReason("");
+    } catch (err) {
+      console.error("[Attendance] holiday save failed:", err);
+      toast.error("Could not mark holiday. Try again.");
+    } finally {
+      setHolidaySaving(false);
     }
   };
 
@@ -281,10 +361,183 @@ export default function Attendance() {
           </p>
         </div>
 
-        {isDesktop && !showGate && stats.pending > 0 && (
-          <BulkButton onClick={bulkMarkRemaining} count={stats.pending} />
-        )}
+        <div style={{
+          display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap",
+          justifyContent: isDesktop ? "flex-end" : "flex-start",
+        }}>
+          {isDesktop && !showGate && stats.pending > 0 && (
+            <BulkButton onClick={bulkMarkRemaining} count={stats.pending} />
+          )}
+          {!showGate && !classDayIsHoliday && (
+            <button
+              type="button"
+              onClick={() => setHolidayOpen(true)}
+              disabled={!roster.length}
+              style={{
+                display: "inline-flex", alignItems: "center", gap: 7,
+                padding: "10px 14px", borderRadius: 16,
+                background: "#fff",
+                border: `1px solid ${PEACH}55`,
+                fontSize: 12, fontWeight: 800, color: "#9A3412",
+                letterSpacing: "-0.1px",
+                cursor: roster.length ? "pointer" : "default",
+                opacity: roster.length ? 1 : 0.5,
+                boxShadow: PILLOW,
+              }}
+              title="Mark whole class day as holiday"
+            >
+              <CalendarOff size={14} strokeWidth={2.5} />
+              Mark Day as Holiday
+            </button>
+          )}
+        </div>
       </header>
+
+      {/* School-holiday banner — principal-declared OR locally-marked.
+          When visible, the roster underneath is still tappable so
+          a teacher can correct mistakes, but the banner makes the
+          state unmistakable. */}
+      {classDayIsHoliday && (
+        <div
+          style={{
+            position: "relative", overflow: "hidden",
+            borderRadius: 22,
+            padding: "14px 18px",
+            background: `linear-gradient(135deg, ${PEACH}1a, ${BLUSH}14)`,
+            border: `1px solid ${PEACH}55`,
+            boxShadow: PILLOW,
+            display: "flex",
+            gap: 12,
+            alignItems: "center",
+          }}
+        >
+          <div
+            style={{
+              width: 44, height: 44, borderRadius: 14,
+              background: `linear-gradient(135deg, ${PEACH}, ${BLUSH})`,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              color: "#fff", flexShrink: 0,
+              transform: "rotate(-6deg)",
+              boxShadow: `0 6px 14px ${PEACH}55`,
+            }}
+            aria-hidden
+          >
+            <PartyPopper size={22} strokeWidth={2.4} />
+          </div>
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <p style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.14em", textTransform: "uppercase", color: "#9A3412" }}>
+              {todaySchoolHoliday ? "School Holiday" : "Class Holiday"}
+            </p>
+            <p style={{ fontSize: 15, fontWeight: 800, color: NAVY, marginTop: 2, letterSpacing: "-0.2px" }}>
+              {todaySchoolHoliday?.reason || holidayReason || "Today is off — no attendance needed."}
+            </p>
+            <p style={{ fontSize: 11, fontWeight: 500, color: "#64748B", marginTop: 3 }}>
+              All children are excluded from today's attendance %.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Holiday confirm modal */}
+      {holidayOpen && (
+        <div
+          onClick={() => !holidaySaving && setHolidayOpen(false)}
+          style={{
+            position: "fixed", inset: 0, zIndex: 60,
+            background: "rgba(15,23,42,0.45)",
+            backdropFilter: "blur(4px)",
+            WebkitBackdropFilter: "blur(4px)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            padding: 16,
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: "100%", maxWidth: 420,
+              background: "#fff",
+              borderRadius: 24,
+              padding: 22,
+              boxShadow: "0 24px 60px rgba(15,23,42,0.20)",
+              position: "relative",
+              overflow: "hidden",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 11, marginBottom: 14 }}>
+              <div style={{
+                width: 40, height: 40, borderRadius: 13,
+                background: `linear-gradient(135deg, ${PEACH}, ${BLUSH})`,
+                display: "flex", alignItems: "center", justifyContent: "center",
+                color: "#fff", flexShrink: 0, boxShadow: `0 4px 10px ${PEACH}55`,
+              }}>
+                <CalendarOff size={18} strokeWidth={2.4} />
+              </div>
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <p style={{ fontSize: 16, fontWeight: 800, color: NAVY, letterSpacing: "-0.3px" }}>
+                  Mark today as a holiday?
+                </p>
+                <p style={{ fontSize: 11, fontWeight: 500, color: "#64748B", marginTop: 2 }}>
+                  {roster.length} child{roster.length === 1 ? "" : "ren"} in {primaryClass.name} will be excluded from today's attendance %.
+                </p>
+              </div>
+            </div>
+            <label style={{ display: "block", marginBottom: 14 }}>
+              <span style={{ fontSize: 11, fontWeight: 800, color: "#475569", letterSpacing: "0.08em", textTransform: "uppercase" }}>
+                Reason (optional)
+              </span>
+              <input
+                type="text"
+                value={holidayReason}
+                onChange={(e) => setHolidayReason(e.target.value)}
+                placeholder="e.g. Republic Day, Founder's Day, snow"
+                disabled={holidaySaving}
+                style={{
+                  marginTop: 6, width: "100%",
+                  padding: "10px 12px",
+                  borderRadius: 12,
+                  border: "1px solid #E2E8F0",
+                  fontSize: 13, fontWeight: 600, color: NAVY,
+                  outline: "none", fontFamily: "inherit",
+                  background: holidaySaving ? "#F1F5F9" : "#fff",
+                }}
+              />
+            </label>
+            <div style={{ display: "flex", gap: 10 }}>
+              <button
+                type="button"
+                onClick={() => setHolidayOpen(false)}
+                disabled={holidaySaving}
+                style={{
+                  flex: 1, padding: "11px 14px", borderRadius: 14,
+                  background: "#F1F5F9",
+                  fontSize: 13, fontWeight: 800, color: "#475569",
+                  border: "none",
+                  cursor: holidaySaving ? "default" : "pointer",
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={saveHoliday}
+                disabled={holidaySaving}
+                style={{
+                  flex: 1, padding: "11px 14px", borderRadius: 14,
+                  background: `linear-gradient(135deg, ${PEACH}, ${BLUSH})`,
+                  fontSize: 13, fontWeight: 800, color: "#fff",
+                  border: "none",
+                  cursor: holidaySaving ? "default" : "pointer",
+                  boxShadow: `0 6px 14px ${PEACH}55`,
+                  display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 7,
+                }}
+              >
+                {holidaySaving ? <Loader2 size={14} className="animate-spin"/> : <CalendarOff size={14} strokeWidth={2.5}/>}
+                {holidaySaving ? "Saving…" : "Confirm Holiday"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showGate && (
         <div
@@ -396,6 +649,7 @@ export default function Attendance() {
               busy={busyIds.has(c.id)}
               onTap={() => markAndOpenMood(c)}
               onLongPress={() => longPressAbsent(c)}
+              onMarkAbsent={() => longPressAbsent(c)}
             />
           );
         })}
@@ -541,25 +795,64 @@ export default function Attendance() {
               })}
             </div>
 
-            <button
-              type="button"
-              onClick={() => setMoodSheetFor(null)}
+            {/* Mark Absent in-sheet escape — for teachers who tapped the
+                card by mistake. Flips the just-written present record to
+                absent and closes the sheet. Visible only when this isn't
+                already an absent student (sheet only opens for non-absent
+                anyway, so always rendered here). */}
+            <div
               style={{
-                width: "100%",
                 marginTop: 14,
-                padding: "10px 14px",
-                borderRadius: 14,
-                background: "transparent",
-                fontSize: 13,
-                fontWeight: 700,
-                color: "#475569",
+                display: "flex",
+                gap: 10,
+                alignItems: "center",
                 position: "relative",
                 zIndex: 1,
-                cursor: "pointer",
               }}
             >
-              Done
-            </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  await longPressAbsent(sheetChild);
+                  setMoodSheetFor(null);
+                }}
+                style={{
+                  flex: 1,
+                  padding: "10px 14px",
+                  borderRadius: 14,
+                  background: "#FFF1F1",
+                  border: `1px solid ${RED}33`,
+                  fontSize: 13,
+                  fontWeight: 800,
+                  color: RED,
+                  cursor: "pointer",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 7,
+                  letterSpacing: "-0.1px",
+                }}
+              >
+                <X size={14} strokeWidth={3} />
+                Mark as Absent
+              </button>
+              <button
+                type="button"
+                onClick={() => setMoodSheetFor(null)}
+                style={{
+                  flex: 1,
+                  padding: "10px 14px",
+                  borderRadius: 14,
+                  background: "transparent",
+                  fontSize: 13,
+                  fontWeight: 700,
+                  color: "#475569",
+                  cursor: "pointer",
+                }}
+              >
+                Done
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -690,6 +983,7 @@ function ChildCard({
   busy,
   onTap,
   onLongPress,
+  onMarkAbsent,
 }: {
   child: RosterChild;
   status: AttendanceStatus;
@@ -697,6 +991,7 @@ function ChildCard({
   busy: boolean;
   onTap: () => void;
   onLongPress: () => void;
+  onMarkAbsent: () => void;
 }) {
   const handlers = useLongPress(onLongPress, onTap, 500);
   const moodEmoji = MOODS.find((m) => m.key === mood)?.emoji;
@@ -738,6 +1033,56 @@ function ChildCard({
       className="active:scale-95"
     >
       <DotScribbles color={scribble} />
+
+      {/* Mark Absent button — explicit affordance so teachers don't have
+          to discover the long-press gesture. Shown in BOTH the "none"
+          decision state AND the "present" state, so a teacher can
+          correct an accidental tap-to-present without long-pressing.
+          Hidden only when the student is already absent (redundant).
+          stopPropagation prevents the parent button's tap-to-present
+          from firing. */}
+      {status !== "absent" && (
+        <span
+          role="button"
+          tabIndex={0}
+          aria-label={`Mark ${child.name.split(" ")[0]} absent`}
+          onClick={(e) => { e.stopPropagation(); if (!busy) onMarkAbsent(); }}
+          onMouseDown={(e) => e.stopPropagation()}
+          onMouseUp={(e) => e.stopPropagation()}
+          onTouchStart={(e) => e.stopPropagation()}
+          onTouchEnd={(e) => e.stopPropagation()}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              e.stopPropagation();
+              if (!busy) onMarkAbsent();
+            }
+          }}
+          style={{
+            position: "absolute",
+            top: 6,
+            left: 6,
+            width: 28,
+            height: 28,
+            borderRadius: 999,
+            background: "#fff",
+            color: RED,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            boxShadow: `0 3px 8px rgba(239,68,68,0.25), 0 0 0 1px ${RED}33 inset`,
+            cursor: busy ? "default" : "pointer",
+            zIndex: 3,
+            transform: "rotate(-6deg)",
+            transition: "transform 120ms ease",
+            touchAction: "manipulation",
+            WebkitTapHighlightColor: "transparent",
+          }}
+          title="Mark absent"
+        >
+          <X size={15} strokeWidth={3} />
+        </span>
+      )}
 
       {/* Avatar — centered, with status ring */}
       <div
@@ -807,17 +1152,20 @@ function ChildCard({
         </div>
       )}
 
-      {/* Mood emoji top-left */}
+      {/* Mood emoji — moved from top-left to bottom-LEFT so it no longer
+          collides with the Mark Absent button that lives top-left when
+          status !== "absent". Floats above the name pill. */}
       {moodEmoji && (
         <div
           style={{
             position: "absolute",
-            top: 6,
-            left: 6,
+            bottom: 38,
+            left: 8,
             fontSize: 22,
             transform: "rotate(-8deg)",
             filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.10))",
             pointerEvents: "none",
+            zIndex: 2,
           }}
           aria-hidden
         >
@@ -902,27 +1250,36 @@ function DotScribbles({
 }
 
 function useLongPress(onLong: () => void, onTap: () => void, ms = 500) {
-  let timer: number | null = null;
-  let triggered = false;
+  // Previous version held `timer` and `triggered` in plain `let` vars at the
+  // top of the hook body — those reset on every render, so any state change
+  // during a press (busy flip, parent re-render) wiped the in-progress
+  // timer + the "did we long-press?" flag. Result: long-press was
+  // unreliable on real devices, which is why the founder thought there
+  // was no way to mark a student absent. useRef survives re-renders.
+  const timerRef     = useRef<number | null>(null);
+  const triggeredRef = useRef(false);
 
   const start = () => {
-    triggered = false;
-    timer = window.setTimeout(() => {
-      triggered = true;
+    triggeredRef.current = false;
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+    }
+    timerRef.current = window.setTimeout(() => {
+      triggeredRef.current = true;
       onLong();
     }, ms);
   };
   const clear = () => {
-    if (timer) {
-      clearTimeout(timer);
-      timer = null;
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
     }
-    if (!triggered) onTap();
+    if (!triggeredRef.current) onTap();
   };
   const cancel = () => {
-    if (timer) {
-      clearTimeout(timer);
-      timer = null;
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
     }
   };
 
