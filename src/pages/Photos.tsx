@@ -149,7 +149,15 @@ export default function Photos() {
       .map((c) => ({ id: c.id, name: c.name }));
 
     try {
-      await uploadPhotos({
+      // Capture the final progress array returned by the hook — using the
+      // local `progress` state here was a stale-closure bug: it always
+      // held the initial (empty) value because the state-setter was
+      // batched, so `failed === 0` evaluated true even when the actual
+      // Firestore addDoc threw silently. The founder saw "uploaded"
+      // toasts for writes that never made it to the collection, which
+      // hid the real "permission-denied / index-missing / undefined-field"
+      // root causes for days. (2026-05-26 fix.)
+      const finalProgress = await uploadPhotos({
         files: previews.map((p) => p.file),
         taggedStudents: taggedChildren,
         slotId: attachToSlot && activeSlot ? activeSlot.id : undefined,
@@ -158,22 +166,38 @@ export default function Photos() {
         onProgress: (p) => setProgress(p),
       });
 
-      const ok = progress.filter((p) => p.status === "done").length;
-      const failed = progress.filter((p) => p.status === "error").length;
+      const ok = finalProgress.filter((p) => p.status === "done").length;
+      const failed = finalProgress.filter((p) => p.status === "error").length;
+      const firstError = finalProgress.find((p) => p.status === "error")?.error;
 
-      if (failed === 0) {
+      if (failed === 0 && ok > 0) {
         toast.success(
-          `${previews.length} photo${previews.length === 1 ? "" : "s"} uploaded · parents will see them live ✓`
+          `${ok} photo${ok === 1 ? "" : "s"} uploaded · parents will see them live ✓`
+        );
+      } else if (ok > 0 && failed > 0) {
+        toast.warning(
+          `${ok} uploaded, ${failed} failed${firstError ? `: ${firstError.slice(0, 120)}` : "."}`
         );
       } else {
-        toast.warning(`${ok} uploaded, ${failed} failed. Check console.`);
+        // All uploads failed — surface the real reason instead of the
+        // misleading "uploaded" success toast.
+        toast.error(
+          firstError
+            ? `Upload failed: ${firstError.slice(0, 200)}`
+            : `Upload failed — check console for details.`
+        );
       }
 
-      previews.forEach((p) => URL.revokeObjectURL(p.url));
-      setPreviews([]);
-      setTaggedIds(new Set());
-      setCaption("");
-      setProgress([]);
+      // Only reset the form when at least one file landed; otherwise the
+      // founder loses their tag selections and would have to redo the
+      // tagging UX before retrying.
+      if (ok > 0) {
+        previews.forEach((p) => URL.revokeObjectURL(p.url));
+        setPreviews([]);
+        setTaggedIds(new Set());
+        setCaption("");
+        setProgress([]);
+      }
     } catch (err) {
       console.error("[Photos] upload error:", err);
       const msg = err instanceof Error ? err.message : String(err);
