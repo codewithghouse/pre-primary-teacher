@@ -5,7 +5,6 @@ import {
   deleteDoc,
   doc,
   onSnapshot,
-  orderBy,
   query,
   serverTimestamp,
   Timestamp,
@@ -84,12 +83,20 @@ export function usePPPhotos(classId: string | null | undefined) {
       setLoading(false);
       return;
     }
+    // No Firestore-side orderBy on `uploadedAt`. We had one briefly but it
+    // dropped freshly-uploaded docs from the snapshot: addDoc writes
+    // `uploadedAt: serverTimestamp()` which is null locally until the
+    // server confirms (~200-700 ms), and Firestore's local query engine
+    // excludes those docs from any orderBy("uploadedAt") result. Net
+    // effect for the founder: just-uploaded photos never appeared in the
+    // Photo Studio grid or the tagged child's profile. Now we sort in
+    // memory below so the new doc shows up the instant addDoc resolves.
+    // (2026-05-26 fix.)
     const q = query(
       collection(db, "pp_photos"),
       where("schoolId", "==", teacherData.schoolId),
       where("classId", "==", classId),
       where("date", "==", today),
-      orderBy("uploadedAt", "desc"),
       fbLimit(200)
     );
     const unsub = onSnapshot(
@@ -119,6 +126,15 @@ export function usePPPhotos(classId: string | null | undefined) {
                 : data.uploadedAt,
           };
         });
+        // Client-side sort: newest first. Docs with pending
+        // serverTimestamp (uploadedAt missing/empty) sort to the TOP
+        // since they just got uploaded — better UX than dropping them.
+        const toMs = (iso?: string): number => {
+          if (!iso) return Number.POSITIVE_INFINITY; // pending → top
+          const t = Date.parse(iso);
+          return Number.isFinite(t) ? t : 0;
+        };
+        rows.sort((a, b) => toMs(b.uploadedAt) - toMs(a.uploadedAt));
         setPhotos(rows);
         setLoading(false);
       },
