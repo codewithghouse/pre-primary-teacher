@@ -78,6 +78,7 @@ const GROUPS: NavGroup[] = [
       { to: "/events", label: "Class Events", icon: CalendarIcon },
       { to: "/photos", label: "Photo Studio", icon: ImageIcon },
       { to: "/reports", label: "Daily Reports", icon: FileText },
+      { to: "/results", label: "Term Reports", icon: FileText },
     ],
   },
   {
