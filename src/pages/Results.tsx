@@ -47,11 +47,17 @@ interface ResultDoc extends DocumentData {
   status: "draft" | "published";
 }
 
+// Normalise a class label for tolerant matching — lowercase + strip every
+// non-alphanumeric char so "Nursery-A", "nursery a" all collapse to "nurserya".
+const norm = (s: any) => (s ?? "").toString().trim().toLowerCase().replace(/[^a-z0-9]/g, "");
+
 export default function Results() {
   const { teacherData } = useAuth();
   const { primaryClass, loading: classLoading } = useTeacherClass();
   const schoolId  = teacherData?.schoolId;
   const classId   = primaryClass?.id;
+  const myClassName = norm(primaryClass?.name);
+  const mySection   = norm(primaryClass?.section);
 
   const [results, setResults] = useState<ResultDoc[]>([]);
   const [loaded, setLoaded]   = useState(false);
@@ -67,7 +73,18 @@ export default function Results() {
     const unsub = onSnapshot(q, snap => {
       const docs = snap.docs
         .map(d => ({ id: d.id, ...d.data() } as ResultDoc))
-        .filter(r => r.status === "published" && r.classId === classId);
+        .filter(r => {
+          if (r.status !== "published") return false;
+          // (a) class-id match.
+          if (classId && r.classId && r.classId === classId) return true;
+          // (b) className + section fallback — survives classId drift between
+          //     the class doc the principal picked and this teacher's class.
+          if (myClassName && norm(r.className) === myClassName) {
+            const rs = norm(r.section);
+            if (!rs || !mySection || rs === mySection) return true;
+          }
+          return false;
+        });
       setResults(docs);
       setLoaded(true);
     }, err => {
@@ -75,7 +92,7 @@ export default function Results() {
       setLoaded(true);
     });
     return () => unsub();
-  }, [schoolId, classId]);
+  }, [schoolId, classId, myClassName, mySection]);
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-[1100px] mx-auto space-y-5">
