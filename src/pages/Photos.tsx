@@ -79,6 +79,14 @@ export default function Photos() {
     };
   }, [photos, roster]);
 
+  // Children whose parent turned OFF photo sharing — they cannot be tagged and
+  // never surface in the parent gallery. Opt-out model: explicit false denies.
+  // NOTE: must stay ABOVE the early returns below — hooks run unconditionally.
+  const noConsentKids = useMemo(
+    () => roster.filter((c) => c.photoConsent === false),
+    [roster]
+  );
+
   useEffect(() => {
     return () => {
       previews.forEach((p) => URL.revokeObjectURL(p.url));
@@ -119,13 +127,6 @@ export default function Photos() {
       return next;
     });
   };
-
-  // Children whose parent turned OFF photo sharing — they cannot be tagged and
-  // never surface in the parent gallery. Opt-out model: explicit false denies.
-  const noConsentKids = useMemo(
-    () => roster.filter((c) => c.photoConsent === false),
-    [roster]
-  );
 
   const toggleTag = (id: string) => {
     const child = roster.find((c) => c.id === id);
