@@ -120,7 +120,21 @@ export default function Photos() {
     });
   };
 
+  // Children whose parent turned OFF photo sharing — they cannot be tagged and
+  // never surface in the parent gallery. Opt-out model: explicit false denies.
+  const noConsentKids = useMemo(
+    () => roster.filter((c) => c.photoConsent === false),
+    [roster]
+  );
+
   const toggleTag = (id: string) => {
+    const child = roster.find((c) => c.id === id);
+    if (child?.photoConsent === false) {
+      toast.error(
+        `${child.name.split(" ")[0]}'s parent turned off photo sharing — can't tag.`
+      );
+      return;
+    }
     setTaggedIds((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
@@ -144,8 +158,10 @@ export default function Photos() {
       }
     }
     setUploading(true);
+    // Defensive: never persist a tag for a child whose consent is denied, even
+    // if the id somehow slipped into the selection.
     const taggedChildren = roster
-      .filter((c) => taggedIds.has(c.id))
+      .filter((c) => taggedIds.has(c.id) && c.photoConsent !== false)
       .map((c) => ({ id: c.id, name: c.name }));
 
     try {
@@ -472,6 +488,31 @@ export default function Photos() {
                   {taggedIds.size} selected
                 </span>
               </div>
+              {noConsentKids.length > 0 && (
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "flex-start",
+                    gap: 8,
+                    padding: "10px 12px",
+                    borderRadius: 14,
+                    background: "linear-gradient(135deg, #FFE4E4 0%, #FFF1F1 100%)",
+                    boxShadow: `inset 0 0 0 1px ${RED}33`,
+                    marginBottom: 10,
+                  }}
+                >
+                  <span style={{ fontSize: 16, flexShrink: 0 }} aria-hidden>
+                    🔒
+                  </span>
+                  <p style={{ fontSize: 11, fontWeight: 600, color: "#B91C1C", lineHeight: 1.5 }}>
+                    <strong style={{ fontWeight: 800 }}>
+                      No photo consent ({noConsentKids.length}):
+                    </strong>{" "}
+                    {noConsentKids.map((c) => c.name.split(" ")[0]).join(", ")}. Please
+                    avoid photographing them — they can't be tagged or shared.
+                  </p>
+                </div>
+              )}
               <div
                 style={{
                   display: "flex",
@@ -490,6 +531,7 @@ export default function Photos() {
                       key={child.id}
                       child={child}
                       selected={taggedIds.has(child.id)}
+                      locked={child.photoConsent === false}
                       onToggle={() => toggleTag(child.id)}
                       disabled={uploading}
                     />
@@ -1199,51 +1241,67 @@ function PreviewTile({
 function TagChip({
   child,
   selected,
+  locked = false,
   onToggle,
   disabled,
 }: {
   child: RosterChild;
   selected: boolean;
+  locked?: boolean;
   onToggle: () => void;
   disabled?: boolean;
 }) {
+  // Locked = parent denied photo consent. Chip still renders (so the teacher
+  // knows the child exists) but is visibly struck-through with a lock and
+  // cannot be selected.
   return (
     <button
       type="button"
       onClick={onToggle}
       disabled={disabled}
+      title={locked ? "Photo sharing turned off by parent" : undefined}
+      aria-disabled={locked}
       style={{
         display: "inline-flex",
         alignItems: "center",
         gap: 6,
         padding: "3px 10px 3px 3px",
         borderRadius: 999,
-        background: selected
+        background: locked
+          ? "#F1F5F9"
+          : selected
           ? `linear-gradient(135deg, ${BLUSH}, #DB2777)`
           : "#fff",
-        color: selected ? "#fff" : NAVY,
+        color: locked ? "#94A3B8" : selected ? "#fff" : NAVY,
         border: "none",
-        cursor: disabled ? "default" : "pointer",
-        opacity: disabled ? 0.5 : 1,
+        cursor: disabled ? "default" : locked ? "not-allowed" : "pointer",
+        opacity: disabled ? 0.5 : locked ? 0.7 : 1,
         fontSize: 12,
         fontWeight: 800,
-        boxShadow: selected
+        textDecoration: locked ? "line-through" : "none",
+        boxShadow: locked
+          ? `inset 0 0 0 1px ${RED}33`
+          : selected
           ? `0 6px 14px -4px ${BLUSH}66`
           : "inset 0 0 0 1px #CBD5E1, 0 2px 6px rgba(15,23,42,0.04)",
         transition: "transform 140ms ease",
       }}
-      className="active:scale-95 hover:-translate-y-0.5"
+      className={locked ? "" : "active:scale-95 hover:-translate-y-0.5"}
     >
-      <span style={{ flexShrink: 0 }}>
+      <span style={{ flexShrink: 0, position: "relative" }}>
         <CartoonAvatar
           name={child.name}
           size={26}
-          ringColor={selected ? "#fff" : BLUSH}
+          ringColor={locked ? "#CBD5E1" : selected ? "#fff" : BLUSH}
           ringWidth={2}
         />
       </span>
       {child.name.split(" ")[0]}
-      {selected && <CheckCircle2 size={12} strokeWidth={3} />}
+      {locked ? (
+        <span style={{ fontSize: 11 }} aria-hidden>🔒</span>
+      ) : (
+        selected && <CheckCircle2 size={12} strokeWidth={3} />
+      )}
     </button>
   );
 }

@@ -28,6 +28,8 @@ export interface RosterChild {
   parentEmail?: string;
   ageMonths?: number;
   authorizedPickup?: { name: string; relation: string; photoURL?: string }[];
+  // Photo-sharing consent. Missing/true => allowed; explicit false => denied.
+  photoConsent?: boolean;
 }
 
 // Reads the roster for a given classId via the `enrollments` collection
@@ -112,6 +114,7 @@ export function useClassRoster(classId: string | null | undefined) {
             authorizedPickup: data.authorizedPickup as
               | RosterChild["authorizedPickup"]
               | undefined,
+            photoConsent: data.photoConsent as boolean | undefined,
           });
         });
         merge();
